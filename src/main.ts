@@ -114,7 +114,7 @@ const main = () => {
     ]
 
     try {
-        parseTable('acb', testTable, testGrammar)
+        parseTable('a c b', testTable, testGrammar)
         console.log('Разбор успешно завершён!')
     } catch (error) {
         console.log('Ошибка: ', error)

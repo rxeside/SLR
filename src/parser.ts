@@ -1,15 +1,7 @@
 import {Grammar, TransitionTable} from '@common/types'
 import {Stack} from '@common/stack'
-import {SYMBOL_START} from '@common/consts'
-
-/** Простейшее сравнение двух массивов на полное совпадение */
-function arraysEqual<T>(a: T[], b: T[]): boolean {
-    if (a.length !== b.length) return false
-    for (let i = 0; i < a.length; i++) {
-        if (a[i] !== b[i]) return false
-    }
-    return true
-}
+import {SEPARATOR_SPACE, STATE_START, SYMBOL_END, SYMBOL_NIHIL} from '@common/consts'
+import {arraysEqual} from '@common/utils'
 
 /**
  * Сдвиг-свёрточный парсер по SLR(1)-таблице
@@ -21,37 +13,37 @@ function arraysEqual<T>(a: T[], b: T[]): boolean {
 function parseTable(
     input: string,
     table: TransitionTable,
-    grammar: Grammar
+    grammar: Grammar,
 ): void {
-    // 1) инициализация
-    const inputQueue = input.split('').concat('#')     // входная очередь, '#' — маркер конца
-    const symbolStack = new Stack<string>()                // стек терминалов/нетерминалов
-    const stateStack = new Stack<string>()                 // стек состояний
-    stateStack.push(SYMBOL_START)                                        // Z — стартовое состояние
+    const inputQueue = input.split(SEPARATOR_SPACE)
+        .filter(item => item.trim() !== SYMBOL_NIHIL)
+        .concat(input.endsWith(SYMBOL_END) ? [] : [SYMBOL_END])
+    const symbolStack = new Stack<string>()
+    const stateStack = new Stack<string>()
+    stateStack.push(STATE_START)
 
     while (inputQueue.length > 0) {
-        // ==== 2) SHIFT/GOTO ====
-        const a = inputQueue.shift()!                             // снимаем символ из входа
-        symbolStack.push(a)                                              // кладём его в стек символов
+        // ==== SHIFT/GOTO ====
+        const currToken = inputQueue.shift()!
+        symbolStack.push(currToken)
 
         const curState = stateStack.peek()!
-        const action = table[curState]?.[a]
+        const action = table[curState]?.[currToken]
         if (!action || action.length === 0) {
-            throw new Error(`Нет перехода из состояния '${curState}' по символу '${a}'`)
+            throw new Error(`Нет перехода из состояния '${curState}' по токену '${currToken}'`)
         }
-        // shift (терминал) или goto (нетерминал) — одно и то же: массив состояний
         // перевод из вида ['a21', 'a42'] в вид состояния 'a21 a42'
         stateStack.push(action.join(' '))
-
-        // ==== 3) REDUCE ====
-        // После каждого shift пытаемся свернуть, пока возможно
         console.log({symbolStack, stateStack})
+
+        // ==== REDUCE ====
+        // После каждого shift пытаемся свернуть, пока возможно
         let reduced: boolean
         do {
             reduced = false
 
             // пробегаем по всем правилам грамматики
-            for (const { left, right } of grammar) {
+            for (const {left, right} of grammar) {
                 const stackArr = symbolStack.toArray()
                 const n = right.length
 
@@ -60,32 +52,33 @@ function parseTable(
                     stackArr.length >= n &&
                     arraysEqual(stackArr.slice(-n), right)
                 ) {
-                    if (left === SYMBOL_START) {
-                        return
-                    }
-
                     // выполняем редукцию:
-                    // 1) выталкиваем из обоих стеков по |right| элементов
+                    // 1) выталкиваем из обоих стеков по длине |right| элементов
                     for (let k = 0; k < n; k++) {
                         symbolStack.pop()
                         stateStack.pop()
                     }
-                    // 2) помещаем нетерминал left обратно в начало входной очереди
+                    // 2) помещаем нетерминал left в начало входной очереди
                     inputQueue.unshift(left)
 
+                    if (left === STATE_START) {
+                        console.log({inputQueue})
+                        return
+                    }
+
                     reduced = true
-                    break  // после редукции начинаем сканировать правила заново
+                    // после редукции начинаем сканировать правила заново
+                    break
                 }
             }
         } while (reduced)
-        console.log(inputQueue)
     }
 
     // ==== 4) завершение ====
     // Успех, если стек символов пуст и в стеке состояний только начальное Z
     if (!symbolStack.isEmpty() ||
         stateStack.size() !== 1 ||
-        stateStack.peek() !== SYMBOL_START
+        stateStack.peek() !== STATE_START
     ) {
         throw new Error('Таблица неверно составлена: недоделанные символы/состояния')
     }

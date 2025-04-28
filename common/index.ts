@@ -1,8 +1,5 @@
-export {
-    Lexeme,
-    Position,
-    Token,
-} from './types'
+export * from './types'
+export * from './consts'
+export * from './utils'
 export {Stack} from './stack'
 export {Queue} from './queue'
-export * from './consts'
