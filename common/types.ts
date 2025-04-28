@@ -63,7 +63,7 @@ type Token = {
 // Представление грамматического правила
 type GrammarRule = {
     left: string;
-    right: string;
+    right: string[];
     ruleIndex: number;
 }
 

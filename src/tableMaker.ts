@@ -1,11 +1,15 @@
 import {GrammarRule, State, TransitionTable} from '@common/types'
-import {SEPARATOR_SPACED_FALLOW, SYMBOL_END} from '@common/consts'
+//import {SEPARATOR_SPACED_FALLOW, SYMBOL_END} from '@common/consts'
+
+const SEPARATOR_SPACED_FALLOW = ' -> '
+const SYMBOL_END = '#'
+
 
 // Парсинг грамматики
 function parseGrammar(raw: string[]): GrammarRule[] {
     return raw.map((rule, index) => {
         const [left, right] = rule.split(SEPARATOR_SPACED_FALLOW)
-        return { left, right, ruleIndex: index }
+        return { left, right: right.split(''), ruleIndex: index }
     })
 }
 

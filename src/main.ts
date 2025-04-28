@@ -3,17 +3,18 @@ import {parseTable} from '@src/parser'
 import {Grammar, TransitionTable} from '@common/types'
 
 const main = () => {
-    // const rawGrammar = [
-    //     'Z->S#',
-    //     'S->aSb',
-    //     'S->ab',
-    //     'S->Sc',
-    //     'S->c'
-    // ];
-    //
-    // const grammar = parseGrammar(rawGrammar);
-    // const transitionTable = buildTransitionTable(grammar);
-    // console.log(JSON.stringify(transitionTable, null, 2));
+    const rawGrammar = [
+        'Z -> S#',
+        'S -> aSb',
+        'S -> ab',
+        'S -> Sc',
+        'S -> c'
+    ];
+
+
+    const grammar = parseGrammar(rawGrammar);
+    const transitionTable = buildTransitionTable(grammar);
+    console.log(JSON.stringify(transitionTable, null, 2));
 
     const testTable: TransitionTable = {
         "Z": {
