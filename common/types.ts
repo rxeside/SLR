@@ -82,11 +82,6 @@ type TransitionTable = {
     };
 }
 
-type Grammar = {
-    left: string,
-    right: string[],
-}[]
-
 export {
     Lexeme,
     Position,
@@ -94,5 +89,4 @@ export {
     GrammarRule,
     State,
     TransitionTable,
-    Grammar,
 }

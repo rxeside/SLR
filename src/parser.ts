@@ -1,23 +1,20 @@
-import {Grammar, TransitionTable} from '@common/types'
+import {GrammarRule, Token, TransitionTable} from '@common/types'
 import {Stack} from '@common/stack'
-import {SEPARATOR_SPACE, STATE_START, SYMBOL_END, SYMBOL_NIHIL} from '@common/consts'
+import {STATE_START} from '@common/consts'
 import {arraysEqual} from '@common/utils'
 
 /**
  * Сдвиг-свёрточный парсер по SLR(1)-таблице
- * @param input — входная строка (терминалы, например 'aabb')
- *                Эндмаркер '#' добавится автоматически
+ * @param tokens — массив токенов, заканчивается Lexeme.GRID ('#')
  * @param table — SLR(1)-таблица переходов
  * @param grammar — список правил вида {left: string, right: string[]}
  */
 function parseTable(
-    input: string,
+    tokens: Token[],
     table: TransitionTable,
-    grammar: Grammar,
+    grammar: GrammarRule[],
 ): void {
-    const inputQueue = input.split(SEPARATOR_SPACE)
-        .filter(item => item.trim() !== SYMBOL_NIHIL)
-        .concat(input.endsWith(SYMBOL_END) ? [] : [SYMBOL_END])
+    const inputQueue: string[] = tokens.map(token => token.lexeme)
     const symbolStack = new Stack<string>()
     const stateStack = new Stack<string>()
     stateStack.push(STATE_START)
@@ -34,7 +31,6 @@ function parseTable(
         }
         // перевод из вида ['a21', 'a42'] в вид состояния 'a21 a42'
         stateStack.push(action.join(' '))
-        console.log({symbolStack, stateStack})
 
         // ==== REDUCE ====
         // После каждого shift пытаемся свернуть, пока возможно
