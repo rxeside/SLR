@@ -1,84 +1,79 @@
-import {Grammar, TransitionTable} from '@common/types'
+import {GrammarRule, Token, TransitionTable} from '@common/types'
 import {Stack} from '@common/stack'
-import {SEPARATOR_SPACE, STATE_START, SYMBOL_END, SYMBOL_NIHIL} from '@common/consts'
-import {arraysEqual} from '@common/utils'
+import {STATE_REDUCE, STATE_START, SYMBOL_END} from '@common/consts'
+import {arrayEqual} from '@common/utils'
+
+type StackItem = {
+    symbol: string,
+    state: string,
+}
 
 /**
  * Сдвиг-свёрточный парсер по SLR(1)-таблице
- * @param input — входная строка (терминалы, например 'aabb')
- *                Эндмаркер '#' добавится автоматически
+ * @param tokens — массив токенов, заканчивается Lexeme.GRID ('#')
  * @param table — SLR(1)-таблица переходов
- * @param grammar — список правил вида {left: string, right: string[]}
+ * @param grammar — список правил вида {left: string, right: string[], ruleIndex: number}
  */
 function parseTable(
-    input: string,
+    tokens: Token[],
     table: TransitionTable,
-    grammar: Grammar,
+    grammar: GrammarRule[],
 ): void {
-    const inputQueue = input.split(SEPARATOR_SPACE)
-        .filter(item => item.trim() !== SYMBOL_NIHIL)
-        .concat(input.endsWith(SYMBOL_END) ? [] : [SYMBOL_END])
-    const symbolStack = new Stack<string>()
-    const stateStack = new Stack<string>()
-    stateStack.push(STATE_START)
+    const inputQueue: string[] = tokens.map(token => token.lexeme)
+    inputQueue.push(SYMBOL_END)
+    const stack = new Stack<StackItem>()
+    stack.push({symbol: STATE_START, state: STATE_START})
 
-    while (inputQueue.length > 0) {
+    let isEnd: boolean = false
+    while (inputQueue.length > 0 && !isEnd) {
         // ==== SHIFT/GOTO ====
         const currToken = inputQueue.shift()!
-        symbolStack.push(currToken)
-
-        const curState = stateStack.peek()!
+        const curState = stack.peek()!.state
         const action = table[curState]?.[currToken]
         if (!action || action.length === 0) {
             throw new Error(`Нет перехода из состояния '${curState}' по токену '${currToken}'`)
         }
-        // перевод из вида ['a21', 'a42'] в вид состояния 'a21 a42'
-        stateStack.push(action.join(' '))
-        console.log({symbolStack, stateStack})
 
         // ==== REDUCE ====
-        // После каждого shift пытаемся свернуть, пока возможно
-        let reduced: boolean
-        do {
-            reduced = false
+        const maybeSymbolReduce = action[0]!
+        if (maybeSymbolReduce[0] !== STATE_REDUCE) {
+            stack.push({symbol: currToken, state: action.join(' ')})
+            continue
+        }
+        let ruleForReduce: GrammarRule
+        const reduceGrammarIndex = maybeSymbolReduce[1]
+        try {
+            ruleForReduce = grammar[reduceGrammarIndex]
+        } catch (error) {
+            throw new Error(`Нет правила с индексом ${reduceGrammarIndex}`)
+        }
+        const {left, right} = ruleForReduce
+        const stackSymbolArr: string[] = stack.toArray().map(item => item.symbol)
+        const n = right.length
 
-            // пробегаем по всем правилам грамматики
-            for (const {left, right} of grammar) {
-                const stackArr = symbolStack.toArray()
-                const n = right.length
+        if (n <= 0 ||
+            stackSymbolArr.length < n ||
+            !arrayEqual(stackSymbolArr.slice(-n), right)
+        ) {
+            throw new Error('Таблица неверно составлена: стек неправильно заполняется')
+        }
 
-                // проверяем, хватает ли символов и совпадает ли хвост
-                if (n > 0 &&
-                    stackArr.length >= n &&
-                    arraysEqual(stackArr.slice(-n), right)
-                ) {
-                    // выполняем редукцию:
-                    // 1) выталкиваем из обоих стеков по длине |right| элементов
-                    for (let k = 0; k < n; k++) {
-                        symbolStack.pop()
-                        stateStack.pop()
-                    }
-                    // 2) помещаем нетерминал left в начало входной очереди
-                    inputQueue.unshift(left)
+        for (let k = 0; k < n; k++) {
+            stack.pop()
+        }
+        inputQueue.unshift(currToken)
+        inputQueue.unshift(left)
 
-                    if (left === STATE_START) {
-                        console.log({inputQueue})
-                        return
-                    }
-
-                    reduced = true
-                    // после редукции начинаем сканировать правила заново
-                    break
-                }
-            }
-        } while (reduced)
+        if (left === STATE_START) {
+            isEnd = true
+        }
     }
 
-    // ==== 4) завершение ====
-    // Успех, если стек символов пуст и в стеке состояний только начальное Z
-    if (!symbolStack.isEmpty() ||
-        stateStack.size() !== 1 ||
-        stateStack.peek() !== STATE_START
+    if (stack.isEmpty() ||
+        stack.toArray().length !== 1 ||
+        stack.toArray().map(item => item.symbol).join('') !== STATE_START ||
+        stack.toArray().map(item => item.state).join('') !== STATE_START ||
+        !arrayEqual(inputQueue, [STATE_START, SYMBOL_END])
     ) {
         throw new Error('Таблица неверно составлена: недоделанные символы/состояния')
     }

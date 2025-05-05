@@ -1,6 +1,7 @@
 import {buildTransitionTable, parseGrammar} from '@src/tableMaker'
 import {parseTable} from '@src/parser'
-import {Grammar, TransitionTable} from '@common/types'
+import {TransitionTable} from '@common/types'
+import {Lexer} from '@src/lexer'
 
 const main = () => {
     /*const rawGrammar = [
@@ -19,114 +20,94 @@ const main = () => {
         '<S> -> c'
     ]
 
-
     const grammar = parseGrammar(rawGrammar);
     const transitionTable = buildTransitionTable(grammar);
-    console.log(JSON.stringify(transitionTable, null, 2));
+    // console.log(transitionTable)
 
     const testTable: TransitionTable = {
         "Z": {
             "Z": ["ok"],
-            "S": ["S11", "S41"],
-            "a": ["a21", "a31"],
+            "S": ["S01", "S31"],
+            "a": ["a11", "a21"],
             "b": [],
-            "c": ["c51"],
-            "#": ["#12"]
-        },
-        "S11 S41": {
-            "Z": [],
-            "S": [],
-            "a": [],
-            "b": [],
-            "c": ["c42"],
-            "#": ["#12"]
-        },
-        "#12": {
-            "Z": [],
-            "S": ["R1"],
-            "a": ["R1"],
-            "b": ["R1"],
-            "c": ["R1"],
-            "#": ["R1"]
-        },
-        "a21 a31": {
-            "Z": [],
-            "S": ["S22", "S41"],
-            "a": ["a21", "a31"],
-            "b": ["b32"],
-            "c": ["c51"],
+            "c": ["c41"],
             "#": []
         },
-        "c51": {
+        "S01 S31": {
             "Z": [],
             "S": [],
             "a": [],
             "b": [],
-            "c": ["R5"],
-            "#": ["R5"]
+            "c": ["c32"],
+            "#": ["#02"]
         },
-        "c42": {
+        "#02": {
+            "Z": [],
+            "S": ["R0"],
+            "a": ["R0"],
+            "b": ["R0"],
+            "c": ["R0"],
+            "#": ["R0"]
+        },
+        "a11 a21": {
+            "Z": [],
+            "S": ["S12", "S31"],
+            "a": ["a11", "a21"],
+            "b": ["b22"],
+            "c": ["c41"],
+            "#": []
+        },
+        "c41": {
             "Z": [],
             "S": [],
             "a": [],
-            "b": [],
+            "b": ["R4"],
             "c": ["R4"],
             "#": ["R4"]
         },
-        "S22 S41": {
+        "c32": {
             "Z": [],
             "S": [],
             "a": [],
-            "b": ["b23"],
-            "c": ["c42"],
-            "#": []
-        },
-        "b32": {
-            "Z": [],
-            "S": [],
-            "a": [],
-            "b": [],
+            "b": ["R3"],
             "c": ["R3"],
             "#": ["R3"]
         },
-        "b23": {
+        "S12 S31": {
             "Z": [],
             "S": [],
             "a": [],
-            "b": [],
+            "b": ["b13"],
+            "c": ["c32"],
+            "#": []
+        },
+        "b22": {
+            "Z": [],
+            "S": [],
+            "a": [],
+            "b": ["R2"],
             "c": ["R2"],
             "#": ["R2"]
+        },
+        "b13": {
+            "Z": [],
+            "S": [],
+            "a": [],
+            "b": ["R1"],
+            "c": ["R1"],
+            "#": ["R1"]
         }
     };
 
-    const testGrammar: Grammar = [
-        {
-            left: 'Z',
-            right: ['S', '#'],
-        },
-        {
-            left: 'S',
-            right: ['a', 'S', 'b'],
-        },
-        {
-            left: 'S',
-            right: ['a', 'b'],
-        },
-        {
-            left: 'S',
-            right: ['S', 'c'],
-        },
-        {
-            left: 'S',
-            right: ['c'],
-        },
-    ]
-
     try {
-        parseTable('a c b', testTable, testGrammar)
+        const lexer = new Lexer()
+        const input = 'a c b'
+
+        const tokens = lexer.tokenize(input)
+        parseTable(tokens, testTable, grammar)
         console.log('Разбор успешно завершён!')
     } catch (error) {
-        console.log('Ошибка: ', error)
+        console.log(error)
     }
 }
 
