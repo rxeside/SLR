@@ -82,6 +82,10 @@ type TransitionTable = {
     };
 }
 
+type FirstSets = Map<string, Set<string>>;
+
+type FollowSets = Map<string, Set<string>>;
+
 export {
     Lexeme,
     Position,
@@ -89,4 +93,6 @@ export {
     GrammarRule,
     State,
     TransitionTable,
+    FirstSets,
+    FollowSets,
 }
