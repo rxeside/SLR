@@ -1,7 +1,12 @@
 import {GrammarRule, Token, TransitionTable} from '@common/types'
 import {Stack} from '@common/stack'
 import {STATE_REDUCE, STATE_START, SYMBOL_END} from '@common/consts'
-import {arraysEqual} from '@common/utils'
+import {arrayEqual} from '@common/utils'
+
+type StackItem = {
+    symbol: string,
+    state: string,
+}
 
 /**
  * Сдвиг-свёрточный парсер по SLR(1)-таблице
@@ -16,15 +21,14 @@ function parseTable(
 ): void {
     const inputQueue: string[] = tokens.map(token => token.lexeme)
     inputQueue.push(SYMBOL_END)
-    const symbolStack = new Stack<string>()
-    const stateStack = new Stack<string>()
-    stateStack.push(STATE_START)
+    const stack = new Stack<StackItem>()
+    stack.push({symbol: STATE_START, state: STATE_START})
 
     let isEnd: boolean = false
     while (inputQueue.length > 0 && !isEnd) {
         // ==== SHIFT/GOTO ====
         const currToken = inputQueue.shift()!
-        const curState = stateStack.peek()!
+        const curState = stack.peek()!.state
         const action = table[curState]?.[currToken]
         if (!action || action.length === 0) {
             throw new Error(`Нет перехода из состояния '${curState}' по токену '${currToken}'`)
@@ -33,9 +37,7 @@ function parseTable(
         // ==== REDUCE ====
         const maybeSymbolReduce = action[0]!
         if (maybeSymbolReduce[0] !== STATE_REDUCE) {
-            symbolStack.push(currToken)
-            // перевод из вида ['a21', 'a42'] в вид состояния 'a21 a42'
-            stateStack.push(action.join(' '))
+            stack.push({symbol: currToken, state: action.join(' ')})
             continue
         }
         let ruleForReduce: GrammarRule
@@ -46,36 +48,32 @@ function parseTable(
             throw new Error(`Нет правила с индексом ${reduceGrammarIndex}`)
         }
         const {left, right} = ruleForReduce
-        const stackArr = symbolStack.toArray()
+        const stackSymbolArr: string[] = stack.toArray().map(item => item.symbol)
         const n = right.length
 
-        // проверяем, хватает ли символов и совпадает ли хвост
-        if (n > 0 &&
-            stackArr.length >= n &&
-            arraysEqual(stackArr.slice(-n), right)
+        if (n <= 0 ||
+            stackSymbolArr.length < n ||
+            !arrayEqual(stackSymbolArr.slice(-n), right)
         ) {
-            // выполняем редукцию:
-            // 1) выталкиваем из обоих стеков по длине |right| элементов
-            for (let k = 0; k < n; k++) {
-                symbolStack.pop()
-                stateStack.pop()
-            }
-            // 2) помещаем нетерминал left в начало входной очереди
-            inputQueue.unshift(currToken)
-            inputQueue.unshift(left)
+            throw new Error('Таблица неверно составлена: стек неправильно заполняется')
+        }
 
-            if (left === STATE_START) {
-                isEnd = true
-            }
+        for (let k = 0; k < n; k++) {
+            stack.pop()
+        }
+        inputQueue.unshift(currToken)
+        inputQueue.unshift(left)
+
+        if (left === STATE_START) {
+            isEnd = true
         }
     }
 
-    // ==== 4) завершение ====
-    // Успех, если стек символов пуст и в стеке состояний только начальное Z
-    if (!symbolStack.isEmpty() ||
-        stateStack.size() !== 1 ||
-        stateStack.peek() !== STATE_START ||
-        !arraysEqual(inputQueue, [STATE_START, SYMBOL_END])
+    if (stack.isEmpty() ||
+        stack.toArray().length !== 1 ||
+        stack.toArray().map(item => item.symbol).join('') !== STATE_START ||
+        stack.toArray().map(item => item.state).join('') !== STATE_START ||
+        !arrayEqual(inputQueue, [STATE_START, SYMBOL_END])
     ) {
         throw new Error('Таблица неверно составлена: недоделанные символы/состояния')
     }
