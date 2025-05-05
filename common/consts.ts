@@ -8,6 +8,7 @@ const SYMBOL_END = '#'
 const SYMBOL_NIHIL = ''
 
 const STATE_START = 'Z'
+const STATE_REDUCE = 'R'
 
 export {
     SEPARATOR_SPACED_SLASH,
@@ -18,4 +19,5 @@ export {
     SYMBOL_END,
     SYMBOL_NIHIL,
     STATE_START,
+    STATE_REDUCE,
 }
