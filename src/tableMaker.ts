@@ -9,11 +9,27 @@ const SYMBOL_END = '#'
 function parseGrammar(raw: string[]): GrammarRule[] {
     return raw.map((rule, index) => {
         const [left, right] = rule.split(SEPARATOR_SPACED_FALLOW)
-        return { left, right: right.split(''), ruleIndex: index }
+
+        const leftSymbol = left.trim()
+        const rightSymbols = right.trim().split(/\s+/) // разделяем по пробелам
+
+        return {
+            left: leftSymbol,
+            right: rightSymbols,
+            ruleIndex: index,
+        }
     })
 }
 
 // Генерация таблицы переходов
+function isNonTerminal(symbol: string): boolean {
+    return /^<.*>$/.test(symbol)
+}
+
+function cleanSymbolName(symbol: string): string {
+    return symbol.replace(/[<>]/g, '')
+}
+
 function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
     const table: TransitionTable = {}
     const states: State[] = []
@@ -31,16 +47,14 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
     // Создание начального состояния Z
     table['Z'] = {}
 
-    // Специальная обработка правила Z -> ... (должно быть одно правило)
-    const zRule = rules.find(r => r.left === 'Z')
+    const zRule = rules.find(r => r.left === '<Z>')
     if (zRule) {
         const firstSymbol = zRule.right[0]
         const subRules = symbolToRules[firstSymbol]
         if (subRules?.length) {
-            const stateName = `${firstSymbol}01`
+            const stateName = `${cleanSymbolName(firstSymbol)}01`
             table['Z'][firstSymbol] = [stateName]
 
-            // Если подставляемое правило — пустое, сразу добавим свёртку
             if (subRules[0].right[0] === 'e') {
                 if (!table['Z']['#']) table['Z']['#'] = []
                 table['Z']['#'].push(`R${subRules[0].ruleIndex}`)
@@ -48,9 +62,9 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
         }
     }
 
-    // Свертка по пустым правилам S → e
+    // Свертка по пустым правилам
     for (const rule of rules) {
-        if (rule.left === 'S' && rule.right[0] === 'e') {
+        if (rule.left === '<S>' && rule.right[0] === 'e') {
             if (!table['Z']['#']) table['Z']['#'] = []
             table['Z']['#'].push(`R${rule.ruleIndex}`)
         }
@@ -62,7 +76,7 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
         for (let i = 0; i < right.length; i++) {
             const symbol = right[i]
             states.push({
-                name: `${symbol}${rule.ruleIndex}${i + 1}`,
+                name: `${cleanSymbolName(symbol)}${rule.ruleIndex}${i + 1}`,
                 symbol,
                 ruleIndex: rule.ruleIndex,
                 position: i + 1,
@@ -77,20 +91,19 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
         table[name] = {}
 
         if (position >= rule.right.length) {
-            // Конец правила — свертка
             table[name]['#'] = [`R${ruleIndex}`]
             continue
         }
 
         const nextSymbol = rule.right[position]
-        const nextStateName = `${nextSymbol}${ruleIndex}${position + 1}`
+        const nextStateName = `${cleanSymbolName(nextSymbol)}${ruleIndex}${position + 1}`
 
         // Явный переход
         if (!table[name][nextSymbol]) table[name][nextSymbol] = []
         table[name][nextSymbol].push(nextStateName)
 
-        // Подстановка только если nextSymbol — нетерминал
-        if (nonTerminals.has(nextSymbol)) {
+        // Подстановка только если нетерминал
+        if (isNonTerminal(nextSymbol)) {
             const subRules = symbolToRules[nextSymbol]
             for (const subRule of subRules) {
                 const subFirst = subRule.right[0]
@@ -98,7 +111,7 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
                     if (!table[name]['#']) table[name]['#'] = []
                     table[name]['#'].push(`R${subRule.ruleIndex}`)
                 } else {
-                    const subState = `${subFirst}${subRule.ruleIndex}1`
+                    const subState = `${cleanSymbolName(subFirst)}${subRule.ruleIndex}1`
                     if (!table[name][subFirst]) table[name][subFirst] = []
                     table[name][subFirst].push(subState)
                 }

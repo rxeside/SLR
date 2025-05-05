@@ -3,13 +3,21 @@ import {parseTable} from '@src/parser'
 import {Grammar, TransitionTable} from '@common/types'
 
 const main = () => {
-    const rawGrammar = [
+    /*const rawGrammar = [
         'Z -> S#',
         'S -> aSb',
         'S -> ab',
         'S -> Sc',
         'S -> c'
-    ];
+    ];*/
+
+    const rawGrammar = [
+        '<Z> -> <S> #',
+        '<S> -> a <S> b',
+        '<S> -> a b',
+        '<S> -> <S> c',
+        '<S> -> c'
+    ]
 
 
     const grammar = parseGrammar(rawGrammar);
