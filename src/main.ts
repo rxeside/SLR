@@ -1,24 +1,24 @@
 import {buildTransitionTable, parseGrammar} from '@src/tableMaker'
-import {parseTable} from '@src/parser'
+import {Parser} from '@src/parser'
 import {TransitionTable} from '@common/types'
 import {Lexer} from '@src/lexer'
 
 const main = () => {
-    /*const rawGrammar = [
-        'Z -> S#',
-        'S -> aSb',
-        'S -> ab',
-        'S -> Sc',
-        'S -> c'
-    ];*/
-
     const rawGrammar = [
-        '<Z> -> <S> #',
-        '<S> -> a <S> b',
-        '<S> -> a b',
-        '<S> -> <S> c',
-        '<S> -> c'
-    ]
+        'Z -> S #',
+        'S -> a S b',
+        'S -> a b',
+        'S -> S c',
+        'S -> c'
+    ];
+
+    // const rawGrammar = [
+    //     '<Z> -> <S> #',
+    //     '<S> -> a <S> b',
+    //     '<S> -> a b',
+    //     '<S> -> <S> c',
+    //     '<S> -> c'
+    // ]
 
     const grammar = parseGrammar(rawGrammar);
     const transitionTable = buildTransitionTable(grammar);
@@ -104,8 +104,9 @@ const main = () => {
         const input = 'a c b'
 
         const tokens = lexer.tokenize(input)
-        parseTable(tokens, testTable, grammar)
-        console.log('Разбор успешно завершён!')
+        const parser = new Parser(tokens, testTable, grammar)
+        parser.parse()
+        console.log("Разбор успешно завершён!")
     } catch (error) {
         console.log(error)
     }
