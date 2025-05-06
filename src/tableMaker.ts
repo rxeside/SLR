@@ -50,14 +50,26 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
     const zRule = rules.find(r => r.left === '<Z>')
     if (zRule) {
         const firstSymbol = zRule.right[0]
+
+        if (!table['Z'][firstSymbol]) table['Z'][firstSymbol] = []
+
+        // Добавляем переход по самому <S>
+        const sState = `${cleanSymbolName(firstSymbol)}01`
+        table['Z'][firstSymbol].push(sState)
+
+        // Рекурсивно добавим переходы по всем первым символам правил для <S>
         const subRules = symbolToRules[firstSymbol]
         if (subRules?.length) {
-            const stateName = `${cleanSymbolName(firstSymbol)}01`
-            table['Z'][firstSymbol] = [stateName]
-
-            if (subRules[0].right[0] === 'e') {
-                if (!table['Z']['#']) table['Z']['#'] = []
-                table['Z']['#'].push(`R${subRules[0].ruleIndex}`)
+            for (const subRule of subRules) {
+                const firstInSub = subRule.right[0]
+                if (firstInSub === 'e') {
+                    if (!table['Z']['#']) table['Z']['#'] = []
+                    table['Z']['#'].push(`R${subRule.ruleIndex}`)
+                } else {
+                    const target = `${cleanSymbolName(firstInSub)}${subRule.ruleIndex}1`
+                    if (!table['Z'][firstInSub]) table['Z'][firstInSub] = []
+                    table['Z'][firstInSub].push(target)
+                }
             }
         }
     }
@@ -119,8 +131,52 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
         }
     }
 
+    // === ОБЪЕДИНЕНИЕ СОСТОЯНИЙ ===
+    const mergedStates: TransitionTable = {}
+    const processed = new Set<string>()
+
+    for (const [state, transitions] of Object.entries(table)) {
+        for (const [symbol, targets] of Object.entries(transitions)) {
+            if (targets.length > 1 && targets.every(t => table[t])) {
+                const mergedKey = targets.join(' ')
+                if (!mergedStates[mergedKey]) {
+                    mergedStates[mergedKey] = {}
+                }
+
+                for (const target of targets) {
+                    const subTransitions = table[target]
+                    for (const [subSymbol, subTargets] of Object.entries(subTransitions)) {
+                        if (!mergedStates[mergedKey][subSymbol]) {
+                            mergedStates[mergedKey][subSymbol] = []
+                        }
+                        mergedStates[mergedKey][subSymbol].push(...subTargets)
+                    }
+                }
+
+                // Удаляем дубликаты
+                for (const key of Object.keys(mergedStates[mergedKey])) {
+                    mergedStates[mergedKey][key] = [...new Set(mergedStates[mergedKey][key])]
+                }
+
+                // Помечаем как обработанные
+                targets.forEach(t => processed.add(t))
+            }
+        }
+    }
+
+    // Добавляем объединённые состояния в таблицу
+    for (const [mergedKey, value] of Object.entries(mergedStates)) {
+        table[mergedKey] = value
+    }
+
+    // Удаляем обработанные одиночные состояния
+    for (const key of processed) {
+        delete table[key]
+    }
+
     return table
 }
+
 
 
 

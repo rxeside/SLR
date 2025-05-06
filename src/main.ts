@@ -4,13 +4,14 @@ import {TransitionTable} from '@common/types'
 import {Lexer} from '@src/lexer'
 
 const main = () => {
-    /*const rawGrammar = [
+    const rawGrammar12 = [
         'Z -> S#',
-        'S -> aSb',
-        'S -> ab',
+        '<Exp> -> <Exp> <Rel> <simexp>',
+        '<Exp> -> <simexp>',
+        '<simexp> -> <simexp> <PLUSO> <simtre>',
         'S -> Sc',
         'S -> c'
-    ];*/
+    ];
 
     const rawGrammar = [
         '<Z> -> <S> #',
@@ -22,7 +23,7 @@ const main = () => {
 
     const grammar = parseGrammar(rawGrammar);
     const transitionTable = buildTransitionTable(grammar);
-    // console.log(transitionTable)
+    console.log(transitionTable)
 
     const testTable: TransitionTable = {
         "Z": {
