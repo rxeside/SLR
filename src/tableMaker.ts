@@ -95,9 +95,65 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
             })
         }
     }
+// Рекурсивная функция для добавления переходов по первым символам
+    function addFirstTransitions(
+        symbol: string,
+        fromState: string,
+        table: TransitionTable,
+        symbolToRules: Record<string, GrammarRule[]>,
+        isNonTerminal: (s: string) => boolean,
+        visited = new Set<string>()
+    ) {
+        if (!isNonTerminal(symbol) || visited.has(symbol)) return;
+        visited.add(symbol);
+
+        const subRules = symbolToRules[symbol];
+        if (!subRules) return;
+
+        for (const subRule of subRules) {
+            const first = subRule.right[0];
+            if (first === "e") {
+                if (!table[fromState]["#"]) table[fromState]["#"] = [];
+                table[fromState]["#"].push(`R${subRule.ruleIndex}`);
+            } else if (isNonTerminal(first)) {
+                // Добавляем переход в промежуточное состояние для нетерминала
+                const subState = `${first}${subRule.ruleIndex}1`;
+                if (!table[fromState][first]) table[fromState][first] = [];
+                table[fromState][first].push(subState);
+                addFirstTransitions(first, fromState, table, symbolToRules, isNonTerminal, visited);
+            } else {
+                const subState = `${first}${subRule.ruleIndex}1`;
+                if (!table[fromState][first]) table[fromState][first] = [];
+                table[fromState][first].push(subState);
+            }
+        }
+    }
+
 
     // Построение переходов
     for (const state of states) {
+        const { name, ruleIndex, position } = state
+        const rule = rules[ruleIndex]
+        table[name] = {}
+
+        if (position >= rule.right.length) {
+            table[name]['#'] = [`R${ruleIndex}`]
+            continue
+        }
+
+        const nextSymbol = rule.right[position]
+        const nextStateName = `${nextSymbol}${ruleIndex}${position + 1}`
+
+        if (!table[name][nextSymbol]) table[name][nextSymbol] = []
+        table[name][nextSymbol].push(nextStateName)
+
+        if (isNonTerminal(nextSymbol)) {
+            addFirstTransitions(nextSymbol, name, table, symbolToRules, isNonTerminal)
+        }
+    }
+
+    // Построение переходов
+    /*for (const state of states) {
         const { name, ruleIndex, position } = state
         const rule = rules[ruleIndex]
         table[name] = {}
@@ -127,46 +183,106 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
                 }
             }
         }
-    }
+    }*/
 
-    // Объединение состояний (если требуется)
-    const mergedStates: TransitionTable = {}
-    const processed = new Set<string>()
+    let somethingMerged = true
 
-    for (const [state, transitions] of Object.entries(table)) {
-        for (const [symbol, targets] of Object.entries(transitions)) {
-            if (targets.length > 1 && targets.every(t => table[t])) {
-                const mergedKey = targets.join(' ')
-                if (!mergedStates[mergedKey]) {
-                    mergedStates[mergedKey] = {}
-                }
+    while (somethingMerged) {
+        somethingMerged = false
+        const mergeMap = new Map<string, string[]>()
 
-                for (const target of targets) {
-                    const subTransitions = table[target]
-                    for (const [subSymbol, subTargets] of Object.entries(subTransitions)) {
-                        if (!mergedStates[mergedKey][subSymbol]) {
-                            mergedStates[mergedKey][subSymbol] = []
-                        }
-                        mergedStates[mergedKey][subSymbol].push(...subTargets)
+        for (const transitions of Object.values(table)) {
+            for (const targets of Object.values(transitions)) {
+                if (targets.length > 1 && targets.every(t => table[t])) {
+                    const mergedKey = targets.join(' ')
+                    if (!mergeMap.has(mergedKey)) {
+                        mergeMap.set(mergedKey, targets)
+                        somethingMerged = true
                     }
                 }
-
-                for (const key of Object.keys(mergedStates[mergedKey])) {
-                    mergedStates[mergedKey][key] = [...new Set(mergedStates[mergedKey][key])]
-                }
-
-                targets.forEach(t => processed.add(t))
             }
+        }
+
+        const mergedStates: TransitionTable = {}
+        const processed = new Set<string>()
+
+        for (const [mergedKey, targets] of mergeMap.entries()) {
+            if (!mergedStates[mergedKey]) mergedStates[mergedKey] = {}
+
+            for (const target of targets) {
+                const subTransitions = table[target]
+                for (const [subSymbol, subTargets] of Object.entries(subTransitions)) {
+                    if (!mergedStates[mergedKey][subSymbol]) {
+                        mergedStates[mergedKey][subSymbol] = []
+                    }
+                    mergedStates[mergedKey][subSymbol].push(...subTargets)
+                }
+            }
+
+            for (const key of Object.keys(mergedStates[mergedKey])) {
+                mergedStates[mergedKey][key] = [...new Set(mergedStates[mergedKey][key])]
+            }
+
+            targets.forEach(t => processed.add(t))
+        }
+
+        for (const [mergedKey, value] of Object.entries(mergedStates)) {
+            table[mergedKey] = value
+        }
+
+        for (const key of processed) {
+            delete table[key]
         }
     }
 
-    for (const [mergedKey, value] of Object.entries(mergedStates)) {
-        table[mergedKey] = value
+    function getFirstSymbols(symbol: string, rules: GrammarRule[], visited = new Set()): string[] {
+        if (!isNonTerminal(symbol)) return [symbol]
+        if (visited.has(symbol)) return []
+
+        visited.add(symbol)
+        const firstSymbols: Set<string> = new Set()
+
+        for (const rule of rules) {
+            if (rule.left === symbol && rule.right.length > 0) {
+                const first = rule.right[0]
+                const nestedFirsts = getFirstSymbols(first, rules, visited)
+                for (const f of nestedFirsts) {
+                    firstSymbols.add(f)
+                }
+            }
+        }
+
+        return Array.from(firstSymbols)
     }
 
-    for (const key of processed) {
-        delete table[key]
+    function getFollowSymbolsRecursive(symbol: string, rules: GrammarRule[], visited = new Set()): string[] {
+        if (visited.has(symbol)) return []
+
+        visited.add(symbol)
+        const followSymbols: Set<string> = new Set()
+
+        for (const rule of rules) {
+            const right = rule.right
+
+            for (let i = 0; i < right.length; i++) {
+                if (right[i] === symbol) {
+                    const next = right[i + 1]
+                    if (next) {
+                        // Следующий символ существует, добавим его first-множество
+                        const nextFirsts = getFirstSymbols(next, rules)
+                        nextFirsts.forEach(s => followSymbols.add(s))
+                    } else {
+                        // Это последний символ — ищем, где rule.left используется
+                        const nestedFollows = getFollowSymbolsRecursive(rule.left, rules, visited)
+                        nestedFollows.forEach(s => followSymbols.add(s))
+                    }
+                }
+            }
+        }
+
+        return Array.from(followSymbols)
     }
+
 
     // Дополнительная свёртка: если символ последний в правиле,
 // то добавляем свёртки по символам, идущим после соответствующего нетерминала в других правилах
@@ -174,31 +290,25 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
         const right = rule.right
         const lastSymbol = right[right.length - 1]
 
-        if (!isNonTerminal(rule.left)) continue // левый должен быть нетерминалом
+        if (!isNonTerminal(rule.left)) continue
         if (!lastSymbol) continue
 
         const targetState = `${lastSymbol}${rule.ruleIndex}${right.length}`
 
-        for (const otherRule of rules) {
-            const r = otherRule.right
+        // Найдём все follow-символы, которые могут идти после rule.left (с рекурсией)
+        const symbolsToAdd = getFollowSymbolsRecursive(rule.left, rules)
 
-            for (let i = 0; i < r.length - 1; i++) {
-                if (r[i] === rule.left) {
-                    const followSymbol = r[i + 1]
-
-                    if (!table[targetState]) {
-                        table[targetState] = {}
-                    }
-                    if (!table[targetState][followSymbol]) {
-                        table[targetState][followSymbol] = []
-                    }
-
-                    table[targetState][followSymbol].push(`R${rule.ruleIndex}`)
-                }
+        for (const sym of symbolsToAdd) {
+            if (!table[targetState]) {
+                table[targetState] = {}
             }
+            if (!table[targetState][sym]) {
+                table[targetState][sym] = []
+            }
+
+            table[targetState][sym].push(`R${rule.ruleIndex}`)
         }
     }
-
 
     return table
 }

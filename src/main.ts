@@ -12,13 +12,25 @@ const main = () => {
         'S -> c'
     ];*/
 
-    const rawGrammar = [
+    /*const rawGrammar = [
         '<Z> -> <S> #',
         '<S> -> a <S> b',
         '<S> -> a b',
         '<S> -> <S> c',
         '<S> -> c'
+    ]*/
+
+    const rawGrammar = [
+        '<Z> -> <S> #',
+        '<S> -> ( )',
+        '<S> -> ( <S> <B> )',
+        '<S> -> ( <S> )',
+        '<S> -> <A>',
+        '<B> -> <S> <B>',
+        '<A> -> a',
+        '<A> -> b'
     ]
+
 
     const grammar = parseGrammar(rawGrammar);
     console.log({gr: grammar[0]!.right})
@@ -77,7 +89,7 @@ const main = () => {
 
     try {
         const lexer = new Lexer()
-        const input = 'a c b'
+        const input = '( a )'
 
         const tokens = lexer.tokenize(input)
         const parser = new Parser(tokens, transitionTable, grammar)
