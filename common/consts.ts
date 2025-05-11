@@ -7,7 +7,7 @@ const SYMBOL_EMPTY = 'e'
 const SYMBOL_END = '#'
 const SYMBOL_NIHIL = ''
 
-const STATE_START = 'Z'
+const STATE_START = '<Z>'
 const STATE_REDUCE = 'R'
 
 export {
