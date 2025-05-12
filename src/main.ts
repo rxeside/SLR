@@ -1,7 +1,7 @@
-import {buildTransitionTable, parseGrammar} from '@src/tableMaker'
-import {Parser} from '@src/parser'
+import {buildTransitionTable, parseGrammar} from '@src/transitionTable/generator'
+import {Parser} from '@src/transitionTable/parser'
 import {TransitionTable} from '@common/types'
-import {Lexer} from '@src/lexer'
+import {Lexer} from '@src/lexer/lexer'
 
 const main = () => {
     /*const rawGrammar = [

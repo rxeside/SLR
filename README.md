@@ -1,100 +1,123 @@
-Prog        → StmtList
-StmtList    → Stmt ; StmtList | ε
+Prog        → StmtList ~~Prog
 
-Stmt        → VarDecl
-| ConstDecl
-| FuncDecl
-| IfStmt
-| WhileStmt
-| ForStmt
-| ForEach
-| Expr
-| Comment
-| AssignExpr
+StmtList    → Stmt ; ~~AddStmt StmtList
+| ε ~~EmptyStmtList
 
-VarDecl     → var ident : Type = Expr
-| var ident : Type
+Stmt        → VarDecl ~~StmtVarDecl
+| ConstDecl ~~StmtConstDecl
+| FuncDecl ~~StmtFuncDecl
+| IfStmt ~~StmtIf
+| WhileStmt ~~StmtWhile
+| ForStmt ~~StmtFor
+| ForEach ~~StmtForEach
+| Expr ~~StmtExpr
+| Comment ~~StmtComment
+| AssignExpr ~~StmtAssign
 
-ConstDecl   → const ident : Type = Expr
+VarDecl     → var ident : Type = Expr ~~VarDeclInit
+| var ident : Type ~~VarDeclNoInit
 
-FuncDecl    → func ident ( ParamList ) : Type Block
-ParamList   → Param , ParamList | Param | ε
-Param       → ident : Type
+ConstDecl   → const ident : Type = Expr ~~ConstDecl
 
-Block       → { StmtList }
+FuncDecl    → func ident ( ParamList ) : Type Block ~~FuncDecl
 
-IfStmt      → if ( Expr ) Block ElseIfList ElseOpt
-ElseIfList  → elif ( Expr ) Block ElseIfList | ε
-ElseOpt     → else Block | ε
+ParamList   → Param , ParamList ~~ParamListMulti
+| Param ~~ParamListSingle
+| ε ~~EmptyParamList
 
-WhileStmt   → while ( Expr ) Block
+Param       → ident : Type ~~Param
 
-ForStmt     → for ( ForInit ; ForCond ; ForUpdate ) Block
-ForInit     → VarDecl | AssignExpr | ε
-ForCond     → Expr
-ForUpdate   → AssignExpr
+Block       → { StmtList } ~~Block
 
-AssignExpr  → ident = Expr
+IfStmt      → if ( Expr ) Block ~~IfMain ElseIfList ElseOpt ~~IfStmt
 
-ForEach     → for ( var ident : Type of Expr ) Block
+ElseIfList  → elif ( Expr ) Block ~~ElseIf ElseIfList
+| ε ~~EmptyElseIfList
 
-Comment     → // .* | /* .*? */
+ElseOpt     → else Block ~~Else
+| ε ~~NoElse
 
-Expr        → RelExpr
-RelExpr     → AddExpr | AddExpr RelOp AddExpr
-AddExpr     → MulExpr | MulExpr AddOp MulExpr
-MulExpr     → UnaryExpr | UnaryExpr MulOp UnaryExpr
-UnaryExpr   → ! UnaryExpr
-| & ident
-| * ident
-| PrimaryExpr
+WhileStmt   → while ( Expr ) Block ~~WhileStmt
 
-PrimaryExpr → ident
-| Literal
-| ( Expr )
-| CallExpr
-| FieldAccess
-| ObjectExpr
-| ArrayExpr
+ForStmt     → for ( ForInit ; ForCond ; ForUpdate ) Block ~~ForStmt
+ForInit     → VarDecl ~~ForInitVar
+| AssignExpr ~~ForInitAssign
+| ε ~~EmptyForInit
 
-CallExpr    → ident ( ArgList )
-ArgList     → Expr , ArgList | Expr | ε
+ForCond     → Expr ~~ForCond
+ForUpdate   → AssignExpr ~~ForUpdate
 
-FieldAccess → PrimaryExpr . ident
+AssignExpr  → ident = Expr ~~Assign
 
-ObjectExpr  → { FieldList }
-FieldList   → Field , FieldList | Field | ε
-Field       → ident : Expr
+ForEach     → for ( var ident : Type of Expr ) Block ~~ForEach
 
-ArrayExpr   → [ ArrayElemList ]
-ArrayElemList → Expr , ArrayElemList | Expr | ε
+Comment     → // .* ~~LineComment
+| /* .*? */ ~~BlockComment
 
-Type        → number
-| boolean
-| string
-| null
-| Type[]
-| ( Type ) => Type
-| pointer Type
-| ObjectType
+Expr        → RelExpr ~~Expr
 
-ObjectType  → { FieldTypeList }
-FieldTypeList → FieldType , FieldTypeList | FieldType | ε
-FieldType   → ident : Type
+RelExpr     → AddExpr ~~RelExprSingle
+| AddExpr RelOp AddExpr ~~RelExprOp
 
-Literal     → INT
-| FLOAT
-| true
-| false
-| STRING
-| ArrayExpr
-| null
+AddExpr     → MulExpr ~~AddExprSingle
+| MulExpr AddOp MulExpr ~~AddExprOp
 
-RelOp       → == | != | < | > | <= | >=
-AddOp       → + | -
-MulOp       → * | / | %
+MulExpr     → UnaryExpr ~~MulExprSingle
+| UnaryExpr MulOp UnaryExpr ~~MulExprOp
 
-ident       → [a-zA-Z_][a-zA-Z0-9_]*
-INT         → [0-9]+
-FLOAT       → [0-9]+ '.' [0-9]+
-STRING      → "\"" .*? "\""
+UnaryExpr   → ! UnaryExpr ~~UnaryNot
+| & ident ~~UnaryAddr
+| * ident ~~UnaryDeref
+| PrimaryExpr ~~UnaryPrimary
+
+PrimaryExpr → ident ~~PrimaryIdent
+| Literal ~~PrimaryLiteral
+| ( Expr ) ~~PrimaryParen
+| CallExpr ~~PrimaryCall
+| FieldAccess ~~PrimaryField
+| ObjectExpr ~~PrimaryObject
+| ArrayExpr ~~PrimaryArray
+
+CallExpr    → ident ( ArgList ) ~~CallExpr
+
+ArgList     → Expr , ArgList ~~ArgListMulti
+| Expr ~~ArgListSingle
+| ε ~~EmptyArgList
+
+FieldAccess → PrimaryExpr . ident ~~FieldAccess
+
+ObjectExpr  → { FieldList } ~~ObjectExpr
+FieldList   → Field , FieldList ~~FieldListMulti
+| Field ~~FieldListSingle
+| ε ~~EmptyFieldList
+
+Field       → ident : Expr ~~Field
+
+ArrayExpr   → [ ArrayElemList ] ~~ArrayExpr
+ArrayElemList → Expr , ArrayElemList ~~ArrayElemListMulti
+| Expr ~~ArrayElemListSingle
+| ε ~~EmptyArrayElemList
+
+Type        → number ~~TypeNumber
+| boolean ~~TypeBoolean
+| string ~~TypeString
+| null ~~TypeNull
+| Type[] ~~TypeArray
+| ( Type ) => Type ~~TypeFunc
+| pointer Type ~~TypePointer
+| ObjectType ~~TypeObject
+
+ObjectType  → { FieldTypeList } ~~ObjectType
+FieldTypeList → FieldType , FieldTypeList ~~FieldTypeListMulti
+| FieldType ~~FieldTypeListSingle
+| ε ~~EmptyFieldTypeList
+
+FieldType   → ident : Type ~~FieldType
+
+Literal     → INT ~~LitInt
+| FLOAT ~~LitFloat
+| true ~~LitTrue
+| false ~~LitFalse
+| STRING ~~LitString
+| ArrayExpr ~~LitArray
+| null ~~LitNull
