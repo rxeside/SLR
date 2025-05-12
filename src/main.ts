@@ -4,92 +4,95 @@ import {TransitionTable} from '@common/types'
 import {Lexer} from '@src/lexer/lexer'
 
 const main = () => {
-    /*const rawGrammar = [
-        'Z -> S #',
-        'S -> a S b',
-        'S -> a b',
-        'S -> S c',
-        'S -> c'
-    ];*/
-
-    /*const rawGrammar = [
+/*    const rawGrammar = [
         '<Z> -> <S> #',
         '<S> -> a <S> b',
         '<S> -> a b',
         '<S> -> <S> c',
         '<S> -> c'
-    ]*/
+    ]
+    */
+    // const rawGrammar = [
+    //     '<Z> -> <S> #',
+    //     '<S> -> <S> + <T>',
+    //     '<S> -> <T>',
+    //     '<T> -> <T> * <F>',
+    //     '<T> -> <F>',
+    //     '<F> -> - <F>',
+    //     '<F> -> ( <S> )',
+    //     '<F> -> id'
+    // ]
 
+    // const rawGrammar = [
+    //     '<Z> -> <S> #',
+    //     '<S> -> ( )',
+    //     '<S> -> ( <S> <B> )',
+    //     '<S> -> ( <S> )',
+    //     '<S> -> <A>',
+    //     '<B> -> * <S> <B>',
+    //     '<B> -> * <S>',
+    //     '<A> -> a',
+    //     '<A> -> b'
+    // ]
+
+    // const rawGrammar = [
+    //     '<Z> -> <S> #',
+    //     '<S> -> ( )',
+    //     '<S> -> ( <S> <B> )',
+    //     '<S> -> ( <S> )',
+    //     '<S> -> <A>',
+    //     '<B> -> , <S> <B>',
+    //     '<B> -> , <S>',
+    //     '<A> -> a',
+    //     '<A> -> b'
+    // ]
+    // const rawGrammar = [
+    //     '<Z> -> <PROG> #',
+    //     '<PROG> -> begin d ; <X> end',
+    //     '<X> -> d ; <X>',
+    //     '<X> -> s <Y>',
+    //     '<X> -> s',
+    //     '<Y> -> ; s <Y>',
+    //     '<Y> -> ; s'
+    // ]
+    // const rawGrammar = [
+    //     '<Z> -> <A> #',
+    //     '<Z> -> #',
+    //     '<A> -> 0 <A>',
+    //     '<A> -> 0',
+    //     '<A> -> 1 <A>',
+    //     '<A> -> 1',
+    //     '<A> -> 2 <A>',
+    //     '<A> -> 2'
+    // ]
     const rawGrammar = [
         '<Z> -> <S> #',
-        '<S> -> ( )',
-        '<S> -> ( <S> <B> )',
-        '<S> -> ( <S> )',
-        '<S> -> <A>',
-        '<B> -> <S> <B>',
+        '<S> -> <A> <B> <C>',
+        '<S> -> <B> <C>',
+        '<S> -> <A> <C>',
+        '<S> -> <A> <B>',
+        '<A> -> <A> a',
         '<A> -> a',
-        '<A> -> b'
+        '<B> -> b <B>',
+        '<B> -> b',
+        '<C> -> <C> c',
+        '<C> -> c'
     ]
 
 
     const grammar = parseGrammar(rawGrammar);
-    console.log({gr: grammar[0]!.right})
     const transitionTable = buildTransitionTable(grammar);
     console.log(transitionTable)
 
-        const testTable: TransitionTable = {
-        "<Z>": {
-            "<Z>": ["ok"],
-            "<S>": ["<S>01", "<S>31"],
-            "a": ["a11", "a21"],
-            "c": ["c41"],
-        },
-        "<S>01 <S>31": {
-            "c": ["c32"],
-            "#": ["#02"]
-        },
-        "#02": {
-            "<S>": ["R0"],
-            "a": ["R0"],
-            "b": ["R0"],
-            "c": ["R0"],
-            "#": ["R0"]
-        },
-        "a11 a21": {
-            "<S>": ["<S>12", "<S>31"],
-            "a": ["a11", "a21"],
-            "b": ["b22"],
-            "c": ["c41"],
-        },
-        "c41": {
-            "b": ["R4"],
-            "c": ["R4"],
-            "#": ["R4"]
-        },
-        "c32": {
-            "b": ["R3"],
-            "c": ["R3"],
-            "#": ["R3"]
-        },
-        "<S>12 <S>31": {
-            "b": ["b13"],
-            "c": ["c32"],
-        },
-        "b22": {
-            "b": ["R2"],
-            "c": ["R2"],
-            "#": ["R2"]
-        },
-        "b13": {
-            "b": ["R1"],
-            "c": ["R1"],
-            "#": ["R1"]
-        }
-    };
-
     try {
         const lexer = new Lexer()
-        const input = '( a )'
+        //const input = '( a )'
+        //const input = '- ( id + id ) * ( id + - id ) + id + id'
+        //const input = '( a )'
+        //const input = '( a , b )'
+        //const input = 'begin d ; s end'
+        //const input = '0 1'
+        const input = 'a b c'
 
         const tokens = lexer.tokenize(input)
         const parser = new Parser(tokens, transitionTable, grammar)
