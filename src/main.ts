@@ -93,8 +93,8 @@ const main = () => {
 
     try {
         const lexer = new Lexer()
-        const input = '- a'
-        //const input = '- ( a + a ) * ( a + - a ) + a + a'
+        //const input = '( a )'
+        const input = '- ( a + a ) * ( a + - a ) + a + a'
         //const input = '( a )'
 
         const tokens = lexer.tokenize(input)
