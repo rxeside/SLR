@@ -65,18 +65,125 @@ const main = () => {
     //     '<A> -> 2 <A>',
     //     '<A> -> 2'
     // ]
+    
+    // const rawGrammar = [
+    //     '<Z> -> <S> #',
+    //     '<S> -> <A> <B> <C>',
+    //     '<S> -> <B> <C>',
+    //     '<S> -> <A> <C>',
+    //     '<S> -> <A> <B>',
+    //     '<A> -> <A> a',
+    //     '<A> -> a',
+    //     '<B> -> b <B>',
+    //     '<B> -> b',
+    //     '<C> -> c',
+    //     '<C> -> <C> c'
+    // ]
     const rawGrammar = [
-        '<Z> -> <S> #',
-        '<S> -> <A> <B> <C>',
-        '<S> -> <B> <C>',
-        '<S> -> <A> <C>',
-        '<S> -> <A> <B>',
-        '<A> -> <A> a',
-        '<A> -> a',
-        '<B> -> b <B>',
-        '<B> -> b',
-        '<C> -> <C> c',
-        '<C> -> c'
+
+        '<Z> -> <Prog> #',
+        '<Prog> -> <StmtList>',
+        '<Prog> -> #',
+
+        '<StmtList> -> <Stmt> ; <StmtList>',
+
+        '<Stmt> -> <VarDecl>',
+        // '<Stmt> -> <ConstDecl>',
+        // '<Stmt> -> <FuncDecl>',
+        // '<Stmt> -> <IfStmt>',
+        // '<Stmt> -> <WhileStmt>',
+        // '<Stmt> -> <ForStmt>',
+        // '<Stmt> -> <Expr>',
+        // '<Stmt> -> <Comment>',
+        // '<Stmt> -> <AssignExpr>',
+
+        '<VarDecl> -> var ident : <Type> = <Expr>',
+        '<VarDecl> -> var ident : <Type>',
+
+        // '<ConstDecl> -> const ident : <Type> = <Expr>',
+
+        // '<FuncDecl> -> func ident ( <ParamList> ) : <Type> <Block>',
+
+        // '<ParamList> -> <Param> , <ParamList>',
+        // '<Param> -> ident : <Type>',
+        //
+        // '<Block> -> { <StmtList> }',
+        //
+        // '<IfStmt> -> if ( <Expr> ) <Block> <ElseIfList> <ElseOpt>',
+        // '<ElseIfList> -> elif ( <Expr> ) <Block> <ElseIfList>',
+        // '<ElseOpt> -> else <Block>',
+        //
+        // '<WhileStmt> -> while ( <Expr> ) <Block>',
+        //
+        // '<ForStmt> -> for ( <ForInit> ; <ForCond> ; <ForUpdate> ) <Block>',
+        // '<ForInit> -> <VarDecl>',
+        // '<ForInit> -> <AssignExpr>',
+        // '<ForCond> -> <Expr>',
+        // '<ForUpdate> -> <AssignExpr>',
+        //
+        // '<AssignExpr> -> ident = <Expr>',
+        //
+        '<Expr> -> <RelExpr>',
+        //
+        '<RelExpr> -> <AddExpr>',
+        //
+        '<AddExpr> -> <MulExpr>',
+
+        '<MulExpr> -> <UnaryExpr>',
+
+
+        '<UnaryExpr> -> <PrimaryExpr>',
+
+        '<PrimaryExpr> -> ident',
+        // '<PrimaryExpr> -> <Literal>',
+        // '<PrimaryExpr> -> ( <Expr> )',
+        // '<PrimaryExpr> -> <CallExpr>',
+        // '<PrimaryExpr> -> <FieldAccess>',
+        // '<PrimaryExpr> -> <ObjectExpr>',
+        // '<PrimaryExpr> -> <ArrayExpr>',
+        //
+        // '<CallExpr> -> ident ( <ArgList> )',
+        //
+        // '<ArgList> -> <Expr> , <ArgList>',
+        // '<ArgList> -> <Expr>',
+        //
+        // '<FieldAccess> -> <PrimaryExpr> . ident',
+        //
+        // '<ObjectExpr> -> { <FieldList> }',
+        //
+        // '<FieldList> -> <Field> , <FieldList>',
+        // '<FieldList> -> <Field>',
+        //
+        // '<Field> -> ident : <Expr>',
+        //
+        // '<ArrayExpr> -> [ <ArrayElemList> ]',
+        //
+        // '<ArrayElemList> -> <Expr> , <ArrayElemList>',
+        // '<ArrayElemList> -> <Expr>',
+        //
+         '<Type> -> number',
+        // '<Type> -> boolean',
+        // '<Type> -> string',
+        // '<Type> -> null',
+        // '<Type> -> <Type> []',
+        // '<Type> -> ( <Type> ) => <Type>',
+        // '<Type> -> pointer <Type>',
+        // '<Type> -> <ObjectType>',
+        //
+        // '<ObjectType> -> { <FieldTypeList> }',
+        //
+        // '<FieldTypeList> -> <FieldType> , <FieldTypeList>',
+        // '<FieldTypeList> -> <FieldType>',
+        //
+        // '<FieldType> -> ident : <Type>',
+        //
+        // '<Literal> -> INT',
+        // '<Literal> -> FLOAT',
+        // '<Literal> -> true',
+        // '<Literal> -> false',
+        // '<Literal> -> STRING',
+        // '<Literal> -> <ArrayExpr>',
+        // '<Literal> -> null'
     ]
 
 
@@ -92,7 +199,8 @@ const main = () => {
         //const input = '( a , b )'
         //const input = 'begin d ; s end'
         //const input = '0 1'
-        const input = 'a b c'
+        //const input = 'a b c'
+        const input = 'var ident : number = ident ;'
 
         const tokens = lexer.tokenize(input)
         const parser = new Parser(tokens, transitionTable, grammar)
