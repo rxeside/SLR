@@ -309,9 +309,13 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
 
         somethingMerged = true; // Раз нашли кандидатов, значит что-то сольем
         const mergedStatesData: TransitionTable = {}; // Временное хранилище для новых слитых состояний
+        const statesToDelete = new Set<string>(); // Собираем все состояния, которые нужно будет удалить ПОСЛЕ обработки всех слияний
 
-        // Создаем новые слитые состояния
+        // Создаем новые слитые состояния и копируем данные
         for (const [mergedKey, targets] of mergeMap.entries()) {
+            // Добавляем все состояния, участвующие в слияниях, в набор для удаления
+            targets.forEach(t => statesToDelete.add(t));
+
             if (mergedStatesData[mergedKey]) continue; // Уже обработали этот ключ слияния
 
             mergedStatesData[mergedKey] = {};
@@ -319,12 +323,18 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
 
             // Собираем все переходы и свёртки из исходных состояний
             for (const targetStateName of targets) {
-                // Если исходное состояние само было результатом слияния и уже удалено, пропускаем
-                if (!table[targetStateName]) continue;
+                // Исходное состояние ДОЛЖНО существовать на этом этапе,
+                // так как мы еще ничего не удаляли в этой итерации while
+                if (!table[targetStateName]) {
+                    // Если это все же произошло, это указывает на другую проблему,
+                    // но основной баг с преждевременным удалением должен быть исправлен.
+                    // console.warn(`Warning: State ${targetStateName} not found during merge for key ${mergedKey}. This might indicate an issue.`);
+                    continue;
+                }
 
                 const sourceTransitions = table[targetStateName];
                 for (const symbol in sourceTransitions) {
-                    const actions = sourceTransitions[symbol]; // Могут быть переходы [state] или свёртки [R_]
+                    const actions = sourceTransitions[symbol];
 
                     if (!newTransitions[symbol]) {
                         newTransitions[symbol] = [];
@@ -339,49 +349,64 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
                 }
 
                 // Проверяем, не является ли *само* исходное состояние `targetStateName`
-                // завершающим состоянием какого-либо правила.
-                // Парсим имя состояния: символ + индекс правила + позиция
+                // завершающим состоянием какого-либо правила для добавления Reduce.
                 const match = targetStateName.match(/^(.+)(\d+)(\d+)$/);
                 if (match) {
-                    //const parsedSymbol = match[1];
                     const ruleIndex = parseInt(match[2], 10);
                     const position = parseInt(match[3], 10);
-                    const originalRule = rules[ruleIndex];
+                    // Убедимся, что rules[ruleIndex] существует
+                    if (ruleIndex >= 0 && ruleIndex < rules.length) {
+                        const originalRule = rules[ruleIndex];
 
-                    if (position === originalRule.right.length) {
-                        // Да, это состояние завершает правило `originalRule`
-                        const leftSymbol = originalRule.left;
-                        const follow = followSets[leftSymbol];
-                        const reduceAction = `R${ruleIndex}`;
+                        if (position === originalRule.right.length) {
+                            // Да, это состояние завершает правило `originalRule`
+                            const leftSymbol = originalRule.left;
+                            const follow = followSets[leftSymbol];
+                            const reduceAction = `R${ruleIndex}`;
 
-                        follow.forEach(followSymbol => {
-                            if (!newTransitions[followSymbol]) {
-                                newTransitions[followSymbol] = [];
-                            }
-                            // Добавляем свёртку, если её ещё нет
-                            if (!newTransitions[followSymbol].includes(reduceAction)) {
-                                // Проверка на конфликты Shift/Reduce или Reduce/Reduce
-                                if (newTransitions[followSymbol].length > 0) {
-                                    // Если уже есть действие (Shift или другая Reduce)
-                                    const existingAction = newTransitions[followSymbol][0];
-                                    if (existingAction !== reduceAction && !existingAction.startsWith('R')) {
-                                        console.error(`КОНФЛИКТ Shift/Reduce в состоянии ${mergedKey} по символу ${followSymbol}: Shift ${existingAction} vs Reduce ${reduceAction}`);
-                                    } else if (existingAction !== reduceAction && existingAction.startsWith('R')) {
-                                        console.error(`КОНФЛИКТ Reduce/Reduce в состоянии ${mergedKey} по символу ${followSymbol}: ${existingAction} vs ${reduceAction}`);
-                                    }
-                                    // В этом примере конфликтов быть не должно, но проверка важна
+                            follow.forEach(followSymbol => {
+                                if (!newTransitions[followSymbol]) {
+                                    newTransitions[followSymbol] = [];
                                 }
-                                newTransitions[followSymbol].push(reduceAction);
-                            }
-                        });
+                                // Добавляем свёртку, если её ещё нет и нет конфликтов
+                                if (!newTransitions[followSymbol].includes(reduceAction)) {
+                                    if (newTransitions[followSymbol].length > 0) {
+                                        const existingAction = newTransitions[followSymbol][0];
+                                        // Проверка на конфликты (добавим логирование для ясности)
+                                        if (!existingAction.startsWith('R') && existingAction !== reduceAction) {
+                                            console.error(`КОНФЛИКТ Shift/Reduce в состоянии ${mergedKey} по символу ${followSymbol}: Обнаружен Shift ${existingAction}, попытка добавить Reduce ${reduceAction} из состояния ${targetStateName}`);
+                                            // Можно добавить стратегию разрешения, например, предпочитать Shift:
+                                            // continue; // Пропустить добавление Reduce
+                                        } else if (existingAction.startsWith('R') && existingAction !== reduceAction) {
+                                            console.error(`КОНФЛИКТ Reduce/Reduce в состоянии ${mergedKey} по символу ${followSymbol}: Обнаружен ${existingAction}, попытка добавить ${reduceAction} из состояния ${targetStateName}`);
+                                            // Можно выбрать правило с меньшим индексом или выдать ошибку
+                                        }
+                                        // Если конфликта нет или мы решили добавить несмотря на конфликт (не рекомендуется без стратегии):
+                                        // newTransitions[followSymbol].push(reduceAction);
+                                    }
+                                    // Добавляем Reduce только если нет конфликта Shift/Reduce (предпочитаем Shift)
+                                    // или если нет других действий
+                                    if (!newTransitions[followSymbol].some(a => !a.startsWith('R'))) {
+                                        if (!newTransitions[followSymbol].includes(reduceAction)){
+                                            newTransitions[followSymbol].push(reduceAction);
+                                        }
+                                    }
+
+                                }
+                            });
+                        }
+                    } else {
+                        console.warn(`Invalid ruleIndex ${ruleIndex} parsed from state name ${targetStateName}`);
                     }
                 }
-
-
             }
-            // Удаляем исходные состояния, которые были слиты
-            targets.forEach(t => delete table[t]);
+            // НЕ УДАЛЯЕМ ЗДЕСЬ: targets.forEach(t => delete table[t]);
         }
+
+        // Удаляем все исходные состояния, участвовавшие в слияниях, ПОСЛЕ обработки всех ключей в mergeMap
+        statesToDelete.forEach(stateName => {
+            delete table[stateName];
+        });
 
         // Добавляем новые слитые состояния в основную таблицу
         Object.assign(table, mergedStatesData);

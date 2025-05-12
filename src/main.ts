@@ -20,7 +20,7 @@ const main = () => {
         '<T> -> <F>',
         '<F> -> - <F>',
         '<F> -> ( <S> )',
-        '<F> -> a'
+        '<F> -> id'
     ]
 
     /*const rawGrammar = [
@@ -37,7 +37,6 @@ const main = () => {
 
 
     const grammar = parseGrammar(rawGrammar);
-    console.log({gr: grammar[0]!.right})
     const transitionTable = buildTransitionTable(grammar);
     console.log(transitionTable)
 
@@ -94,7 +93,7 @@ const main = () => {
     try {
         const lexer = new Lexer()
         //const input = '( a )'
-        const input = '- ( a + a ) * ( a + - a ) + a + a'
+        const input = '- ( id + id ) * ( id + - id ) + id + id'
         //const input = '( a )'
 
         const tokens = lexer.tokenize(input)
