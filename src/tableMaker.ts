@@ -54,25 +54,10 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
         const sState = `${firstSymbol}01`
         table[startState][firstSymbol].push(sState)
 
-        // Рекурсивно добавим переходы по всем первым символам правил для <S>
-        const subRules = symbolToRules[firstSymbol]
-        if (subRules?.length) {
-            for (const subRule of subRules) {
-                const firstInSub = subRule.right[0]
-                if (firstInSub === 'e') {
-                    if (!table[startState]['#']) table[startState]['#'] = []
-                    table[startState]['#'].push(`R${subRule.ruleIndex}`)
-                } else {
-                    const target = `${firstInSub}${subRule.ruleIndex}1`
-                    if (!table[startState][firstInSub]) table[startState][firstInSub] = []
-                    table[startState][firstInSub].push(target)
-                }
-            }
-        }
-
-        // Переход по самому <Z> → ok (можно удалить, если не нужен)
-        table[startState][startState] = ['ok']
+        // Рекурсивно добавить все возможные первые терминальные переходы
+        addFirstTransitions(firstSymbol, startState, table, symbolToRules, isNonTerminal)
     }
+
 
     // Свертка по пустым правилам
     for (const rule of rules) {
@@ -235,6 +220,8 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
         }
     }
 
+
+
     function getFirstSymbols(symbol: string, rules: GrammarRule[], visited = new Set()): string[] {
         if (!isNonTerminal(symbol)) return [symbol]
         if (visited.has(symbol)) return []
@@ -309,6 +296,8 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
             table[targetState][sym].push(`R${rule.ruleIndex}`)
         }
     }
+
+
 
     return table
 }

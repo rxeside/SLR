@@ -4,32 +4,36 @@ import {TransitionTable} from '@common/types'
 import {Lexer} from '@src/lexer'
 
 const main = () => {
-    /*const rawGrammar = [
-        'Z -> S #',
-        'S -> a S b',
-        'S -> a b',
-        'S -> S c',
-        'S -> c'
-    ];*/
-
-    /*const rawGrammar = [
+/*    const rawGrammar = [
         '<Z> -> <S> #',
         '<S> -> a <S> b',
         '<S> -> a b',
         '<S> -> <S> c',
         '<S> -> c'
-    ]*/
-
+    ]
+    */
     const rawGrammar = [
+        '<Z> -> <S> #',
+        '<S> -> <S> + <T>',
+        '<S> -> <T>',
+        '<T> -> <T> * <F>',
+        '<T> -> <F>',
+        '<F> -> - <F>',
+        '<F> -> ( <S> )',
+        '<F> -> a'
+    ]
+
+    /*const rawGrammar = [
         '<Z> -> <S> #',
         '<S> -> ( )',
         '<S> -> ( <S> <B> )',
         '<S> -> ( <S> )',
         '<S> -> <A>',
-        '<B> -> <S> <B>',
+        '<B> -> * <S> <B>',
+        '<B> -> * <S>',
         '<A> -> a',
         '<A> -> b'
-    ]
+    ]*/
 
 
     const grammar = parseGrammar(rawGrammar);
@@ -89,7 +93,9 @@ const main = () => {
 
     try {
         const lexer = new Lexer()
-        const input = '( a )'
+        const input = '- a'
+        //const input = '- ( a + a ) * ( a + - a ) + a + a'
+        //const input = '( a )'
 
         const tokens = lexer.tokenize(input)
         const parser = new Parser(tokens, transitionTable, grammar)
