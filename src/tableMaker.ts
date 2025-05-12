@@ -415,46 +415,69 @@ function buildTransitionTable(rules: GrammarRule[]): TransitionTable {
 
     // 3. Финальная обработка: Добавляем свёртки для *не слитых* завершающих состояний
     //    (Те состояния, которые завершают правило, но не участвовали в слияниях)
-    const finalTable: TransitionTable = JSON.parse(JSON.stringify(table)); // Глубокая копия для итерации
+    const finalTable: TransitionTable = JSON.parse(JSON.stringify(table)); // <<< ВОЗВРАЩАЕМ ГЛУБОКУЮ КОПИЮ
 
-    for (const stateName in table) {
-        // Проверяем, является ли *это* состояние завершающим
-        const match = stateName.match(/^(.+)(\d+)(\d+)$/);
+    for (const stateName in table) { // Итерируем по ключам ОРИГИНАЛЬНОЙ таблицы ПОСЛЕ слияния
+        // Проверяем, является ли *это* состояние завершающим по имени
+        const match = stateName.match(/^(.+?)(\d+)(\d+)$/); // Non-greedy match for symbol
         if (match) {
             const ruleIndex = parseInt(match[2], 10);
             const position = parseInt(match[3], 10);
+
+            // Проверяем валидность индекса правила
+            if (ruleIndex < 0 || ruleIndex >= rules.length) {
+                console.warn(`Invalid ruleIndex ${ruleIndex} parsed from state name ${stateName} in final processing loop.`);
+                continue; // Пропускаем невалидное состояние
+            }
             const rule = rules[ruleIndex];
 
+            // Проверяем, действительно ли позиция соответствует концу правила
             if (position === rule.right.length) {
                 // Да, это завершающее состояние
                 const leftSymbol = rule.left;
                 const follow = followSets[leftSymbol];
                 const reduceAction = `R${ruleIndex}`;
 
-                if (!finalTable[stateName]) finalTable[stateName] = {}; // На всякий случай
+                // Убеждаемся, что состояние существует в КОПИИ (должно, если было в оригинале)
+                if (!finalTable[stateName]) {
+                    console.warn(`State ${stateName} missing in finalTable copy during final processing.`);
+                    finalTable[stateName] = {}; // Создаем на всякий случай
+                }
 
                 follow.forEach(followSymbol => {
+                    // Убеждаемся, что массив для символа существует в КОПИИ
                     if (!finalTable[stateName][followSymbol]) {
                         finalTable[stateName][followSymbol] = [];
                     }
-                    if (!finalTable[stateName][followSymbol].includes(reduceAction)) {
-                        // Проверка на конфликты (аналогично коду слияния)
-                        if (finalTable[stateName][followSymbol].length > 0) {
-                            const existingAction = finalTable[stateName][followSymbol][0];
-                            if (existingAction !== reduceAction && !existingAction.startsWith('R')) {
-                                console.error(`КОНФЛИКТ Shift/Reduce в состоянии ${stateName} по символу ${followSymbol}: Shift ${existingAction} vs Reduce ${reduceAction}`);
-                            } else if (existingAction !== reduceAction && existingAction.startsWith('R')) {
-                                console.error(`КОНФЛИКТ Reduce/Reduce в состоянии ${stateName} по символу ${followSymbol}: ${existingAction} vs ${reduceAction}`);
-                            }
+
+                    let addAction = true; // Флаг, разрешающий добавление действия
+
+                    // Проверяем, нужно ли добавлять (нет дубликатов + разрешение конфликтов)
+                    if (finalTable[stateName][followSymbol].includes(reduceAction)) {
+                        addAction = false; // Уже есть такое действие, не добавляем
+                    } else if (finalTable[stateName][followSymbol].length > 0) {
+                        // Есть другие действия, проверяем конфликты
+                        const existingAction = finalTable[stateName][followSymbol][0];
+                        if (!existingAction.startsWith('R')) { // Конфликт Shift/Reduce
+                            console.error(`КОНФЛИКТ Shift/Reduce в состоянии ${stateName} по символу ${followSymbol}: Обнаружен Shift ${existingAction}, попытка добавить Reduce ${reduceAction}. Предпочитаем Shift.`);
+                            addAction = false; // НЕ добавляем Reduce при S/R конфликте
+                        } else { // Конфликт Reduce/Reduce (existingAction !== reduceAction т.к. проверили includes выше)
+                            console.error(`КОНФЛИКТ Reduce/Reduce в состоянии ${stateName} по символу ${followSymbol}: Обнаружен ${existingAction}, попытка добавить ${reduceAction}. Оставляем первый (${existingAction}).`);
+                            addAction = false; // НЕ добавляем второй Reduce при R/R конфликте
                         }
+                    }
+                    // else { /* Массив пуст, конфликтов нет */ }
+
+                    // Добавляем действие, если разрешено
+                    if (addAction) {
                         finalTable[stateName][followSymbol].push(reduceAction);
                     }
-                });
-            }
-        }
-    }
+                }); // конец follow.forEach
+            } // конец if (position === rule.right.length)
+        } // конец if (match)
+    } // конец for (const stateName in table)
 
-    return finalTable;
+    return finalTable; // <<< ВОЗВРАЩАЕМ ИЗМЕНЕННУЮ КОПИЮ
 }
 
 
