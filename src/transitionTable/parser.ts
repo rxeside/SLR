@@ -85,7 +85,7 @@ class Parser {
             return null
         }
         let ruleForReduce: GrammarRule
-        const reduceGrammarIndex = maybeSymbolReduce[1]
+        const reduceGrammarIndex = maybeSymbolReduce.slice(1)
         try {
             ruleForReduce = this.grammar[reduceGrammarIndex]
         } catch (error) {
