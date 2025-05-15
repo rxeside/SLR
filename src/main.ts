@@ -1,6 +1,5 @@
 import {buildTransitionTable, parseGrammar} from '@src/transitionTable/generator'
 import {Parser} from '@src/transitionTable/parser'
-import {TransitionTable} from '@common/types'
 import {Lexer} from '@src/lexer/lexer'
 
 const main = () => {
@@ -12,16 +11,17 @@ const main = () => {
         '<S> -> c'
     ]
     */
-    // const rawGrammar = [
-    //     '<Z> -> <S> #',
-    //     '<S> -> <S> + <T>',
-    //     '<S> -> <T>',
-    //     '<T> -> <T> * <F>',
-    //     '<T> -> <F>',
-    //     '<F> -> - <F>',
-    //     '<F> -> ( <S> )',
-    //     '<F> -> id'
-    // ]
+    const rawGrammar = [
+        '<Z> -> <S> #',
+        '<S> -> <S> + <T>',
+        '<S> -> <T>',
+        '<T> -> <T> * <F>',
+        '<T> -> <F>',
+        '<F> -> - <F>',
+        '<F> -> ( <S> )',
+        '<F> -> id',
+        '<F> -> num',
+    ]
 
     // const rawGrammar = [
     //     '<Z> -> <S> #',
@@ -65,19 +65,19 @@ const main = () => {
     //     '<A> -> 2 <A>',
     //     '<A> -> 2'
     // ]
-    const rawGrammar = [
-        '<Z> -> <S> #',
-        '<S> -> <A> <B> <C>',
-        '<S> -> <B> <C>',
-        '<S> -> <A> <C>',
-        '<S> -> <A> <B>',
-        '<A> -> <A> a',
-        '<A> -> a',
-        '<B> -> b <B>',
-        '<B> -> b',
-        '<C> -> <C> c',
-        '<C> -> c'
-    ]
+    // const rawGrammar = [
+    //     '<Z> -> <S> #',
+    //     '<S> -> <A> <B> <C>',
+    //     '<S> -> <B> <C>',
+    //     '<S> -> <A> <C>',
+    //     '<S> -> <A> <B>',
+    //     '<A> -> <A> a',
+    //     '<A> -> a',
+    //     '<B> -> b <B>',
+    //     '<B> -> b',
+    //     '<C> -> <C> c',
+    //     '<C> -> c'
+    // ]
 
 
     const grammar = parseGrammar(rawGrammar);
@@ -87,12 +87,12 @@ const main = () => {
     try {
         const lexer = new Lexer()
         //const input = '( a )'
-        //const input = '- ( id + id ) * ( id + - id ) + id + id'
+        const input = '- ( bombardiro + crocodilo ) * ( 4 + - 6 ) + cucarecu + id'
         //const input = '( a )'
         //const input = '( a , b )'
         //const input = 'begin d ; s end'
         //const input = '0 1'
-        const input = 'a b c'
+        // const input = 'a b c'
 
         const tokens = lexer.tokenize(input)
         const parser = new Parser(tokens, transitionTable, grammar)

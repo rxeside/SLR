@@ -1,6 +1,6 @@
-import {GrammarRule, Token, TransitionTable} from '@common/types'
+import {GrammarRule, Lexeme, Token, TransitionTable} from '@common/types'
 import {Stack} from '@common/stack'
-import {STATE_REDUCE, STATE_START, SYMBOL_END} from '@common/consts'
+import {SEPARATOR_SPACE, STATE_REDUCE, STATE_START, SYMBOL_END} from '@common/consts'
 import {arrayEqual} from '@common/utils'
 
 type StackItem = {
@@ -12,6 +12,17 @@ type ControlObj = {
     isEnd: boolean
 }
 
+type QueueItem = {
+    grammarSymbol: string,
+    token: Token
+}
+
+const TOKEN_TYPE_TO_GRAMMAR_SYMBOL_MAP: Partial<Record<Lexeme, string>> = {
+    [Lexeme.IDENTIFIER]: 'id',
+    [Lexeme.INTEGER]: 'num',
+    [Lexeme.FLOAT]: 'num',
+}
+
 class Parser {
     /** Переменные определяющие парсер, то есть он напрямую связан с токенами, таблицей, грамматикой **/
     private readonly tokens: Token[]
@@ -20,8 +31,8 @@ class Parser {
 
     /** Рабочие переменные **/
     private stack: Stack<StackItem>
-    private inputQueue: string[]
-    private currToken: string
+    private inputQueue: QueueItem[]
+    private currToken: QueueItem
     private currState: string
 
     /**
@@ -30,7 +41,7 @@ class Parser {
      * @param table — SLR(1)-таблица переходов
      * @param grammar — список правил вида {left: string, right: string[], ruleIndex: number}
      */
-    constructor(tokens: Token[],table: TransitionTable, grammar: GrammarRule[]) {
+    constructor(tokens: Token[], table: TransitionTable, grammar: GrammarRule[]) {
         this.tokens = tokens
         this.table = table
         this.grammar = grammar
@@ -38,18 +49,27 @@ class Parser {
 
     parse(): void {
         this._initialize()
+        // console.log(JSON.stringify({queue: this.inputQueue}, null, 2))
 
         let controlObj: ControlObj = {isEnd: false}
         while (this.inputQueue.length > 0 && !controlObj.isEnd) {
             const currAction = this._shift()
+            // console.log('shift ', {currAction})
 
             const ruleForReduce = this._findRuleForReduce(currAction)
             if (ruleForReduce === null) {
-                this.stack.push({symbol: this.currToken, state: currAction.join(' ')})
+                this.stack.push({
+                    symbol: this.currToken.grammarSymbol,
+                    state: currAction.join(SEPARATOR_SPACE)
+                })
+                // console.log(JSON.stringify({stack: this.stack.toArray()}, null, 2))
                 continue
             }
 
             this._reduceByGrammarRule(ruleForReduce, controlObj)
+            // console.log('reduce')
+            // console.log(JSON.stringify({queue: this.inputQueue}, null, 2))
+            // console.log(JSON.stringify({stack: this.stack.toArray()}, null, 2))
         }
 
         this._verifyCompletedCorrectly()
@@ -57,8 +77,14 @@ class Parser {
 
     /** Инициализация по параметрам конструктора парсера **/
     private _initialize() {
-        this.inputQueue = this.tokens.map(token => token.lexeme)
-        this.inputQueue.push(SYMBOL_END)
+        this.inputQueue = this.tokens.map(token => ({
+            grammarSymbol: TOKEN_TYPE_TO_GRAMMAR_SYMBOL_MAP[token.type] || token.lexeme,
+            token: token,
+        }))
+        this.inputQueue.push({
+            grammarSymbol: SYMBOL_END,
+            token: {type: Lexeme.EOF, lexeme: SYMBOL_END} as Token},
+        )
 
         this.stack = new Stack<StackItem>()
         this.stack.push({symbol: STATE_START, state: STATE_START})
@@ -69,10 +95,10 @@ class Parser {
         this.currToken = this.inputQueue.shift()!
         this.currState = this.stack.peek()!.state
 
-        const currAction = this.table[this.currState]?.[this.currToken]
+        const currAction = this.table[this.currState]?.[this.currToken.grammarSymbol]
 
         if (!currAction || currAction.length === 0) {
-            throw new Error(`Нет перехода из состояния '${this.currState}' по токену '${this.currToken}'`)
+            throw new Error(`Нет перехода из состояния '${this.currState}' по символу '${this.currToken.grammarSymbol}' (оригинальный токен: '${this.currToken.token.lexeme}' типа ${this.currToken.token.type})`)
         }
 
         return currAction
@@ -112,7 +138,7 @@ class Parser {
             this.stack.pop()
         }
         this.inputQueue.unshift(this.currToken)
-        this.inputQueue.unshift(left)
+        this.inputQueue.unshift({grammarSymbol: left, token: {} as Token})
 
         if (left === STATE_START) {
             controlObj.isEnd = true
@@ -125,7 +151,9 @@ class Parser {
             this.stack.toArray().length !== 1 ||
             this.stack.toArray().map(item => item.symbol).join('') !== STATE_START ||
             this.stack.toArray().map(item => item.state).join('') !== STATE_START ||
-            !arrayEqual(this.inputQueue, [STATE_START, SYMBOL_END])
+            this.inputQueue.length !== 2 ||
+            this.inputQueue[0].grammarSymbol !== STATE_START ||
+            this.inputQueue[1].grammarSymbol !== SYMBOL_END
         ) {
             throw new Error('Таблица неверно составлена: недоделанные символы/состояния')
         }
