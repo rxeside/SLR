@@ -104,21 +104,36 @@ class Parser {
         return currAction
     }
 
-    /** Возвращает правило для свёртки, если текущее действие - свёртка (R(n)) **/
+    /** Возвращает правило для свёртки, если текущее действие - свёртка (R(n) или R(n)~action) **/
     private _findRuleForReduce(currAction: string[]): GrammarRule | null {
-        const maybeSymbolReduce = currAction[0]!
-        if (maybeSymbolReduce[0] !== STATE_REDUCE) {
-            return null
-        }
-        let ruleForReduce: GrammarRule
-        const reduceGrammarIndex = maybeSymbolReduce.slice(1)
-        try {
-            ruleForReduce = this.grammar[reduceGrammarIndex]
-        } catch (error) {
-            throw new Error(`Нет правила с индексом ${reduceGrammarIndex}`)
+        const actionString = currAction[0];
+
+        if (!actionString || actionString[0] !== STATE_REDUCE) {
+            return null;
         }
 
-        return ruleForReduce
+        let ruleIndexPart = actionString.substring(1);
+
+        const tildePosition = ruleIndexPart.indexOf('~');
+        if (tildePosition !== -1) {
+            ruleIndexPart = ruleIndexPart.substring(0, tildePosition);
+        }
+
+        const ruleIndex = parseInt(ruleIndexPart, 10);
+
+        if (isNaN(ruleIndex)) {
+            console.error(`Ошибка парсинга индекса правила из действия свёртки: ${actionString}`);
+            throw new Error(`Невалидный формат действия свёртки: ${actionString}. Не удалось извлечь индекс правила.`);
+        }
+
+        const ruleForReduce = this.grammar[ruleIndex];
+
+        if (!ruleForReduce) {
+            console.error(`Правило грамматики с индексом ${ruleIndex} не найдено (для действия ${actionString}).`);
+            throw new Error(`Правило грамматики с индексом ${ruleIndex} не найдено.`);
+        }
+
+        return ruleForReduce;
     }
 
     /** Свёртка по конкретному правилу **/

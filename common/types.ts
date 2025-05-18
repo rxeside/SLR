@@ -65,6 +65,7 @@ type GrammarRule = {
     left: string;
     right: string[];
     ruleIndex: number;
+    semanticAction?: string;
 }
 
 // Представление состояния: символ на позиции с индексом

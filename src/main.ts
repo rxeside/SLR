@@ -11,17 +11,17 @@ const main = () => {
         '<S> -> c'
     ]
     */
-    const rawGrammar = [
+    const rawGrammarWithAction = [
         '<Z> -> <S> #',
-        '<S> -> <S> + <T>',
+        '<S> -> <S> + <T> ~act_plus', // действие для сложения
         '<S> -> <T>',
-        '<T> -> <T> * <F>',
+        '<T> -> <T> * <F> ~act_mul',  // действие для умножения
         '<T> -> <F>',
-        '<F> -> - <F>',
+        '<F> -> - <F> ~act_neg',     // действие для унарного минуса
         '<F> -> ( <S> )',
-        '<F> -> id',
-        '<F> -> num',
-    ]
+        '<F> -> id ~act_id',         // действие для идентификатора
+        '<F> -> num ~act_num',       // действие для числа
+    ];
 
     // const rawGrammar = [
     //     '<Z> -> <S> #',
@@ -80,7 +80,7 @@ const main = () => {
     // ]
 
 
-    const grammar = parseGrammar(rawGrammar);
+    const grammar = parseGrammar(rawGrammarWithAction);
     const transitionTable = buildTransitionTable(grammar);
     console.log(transitionTable)
 
