@@ -1,4 +1,4 @@
-import {buildTransitionTable, parseGrammar} from '@src/transitionTable/generator'
+import {SLRTableGenerator, parseGrammar} from '@src/transitionTable/generator'
 import {Parser} from '@src/transitionTable/parser'
 import {Lexer} from '@src/lexer/lexer'
 
@@ -80,8 +80,9 @@ const main = () => {
     // ]
 
 
-    const grammar = parseGrammar(rawGrammarWithAction);
-    const transitionTable = buildTransitionTable(grammar);
+    const generator = new SLRTableGenerator(rawGrammarWithAction);
+
+    const transitionTable = generator.buildTable();
     console.log(transitionTable)
 
     try {
@@ -95,7 +96,8 @@ const main = () => {
         // const input = 'a b c'
 
         const tokens = lexer.tokenize(input)
-        const parser = new Parser(tokens, transitionTable, grammar)
+        const grammar = parseGrammar(rawGrammarWithAction);
+        const parser = new Parser(tokens, transitionTable, grammar);
         parser.parse()
         console.log("Разбор успешно завершён!")
     } catch (error) {
