@@ -23,7 +23,7 @@ const TOKEN_TYPE_TO_GRAMMAR_SYMBOL_MAP: Partial<Record<Lexeme, string>> = {
     [Lexeme.FLOAT]: 'num',
 }
 
-class Parser {
+class SLRTableParser {
     /** Переменные определяющие парсер, то есть он напрямую связан с токенами, таблицей, грамматикой **/
     private readonly tokens: Token[]
     private readonly table: TransitionTable
@@ -170,5 +170,5 @@ class Parser {
 }
 
 export {
-    Parser,
+    SLRTableParser,
 }

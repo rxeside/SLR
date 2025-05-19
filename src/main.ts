@@ -1,5 +1,5 @@
 import {SLRTableGenerator, parseGrammar} from '@src/transitionTable/generator'
-import {Parser} from '@src/transitionTable/parser'
+import {SLRTableParser} from '@src/transitionTable/parser'
 import {Lexer} from '@src/lexer/lexer'
 
 const main = () => {
@@ -86,7 +86,6 @@ const main = () => {
     console.log(transitionTable)
 
     try {
-        const lexer = new Lexer()
         //const input = '( a )'
         const input = '- ( bombardiro + crocodilo ) * ( 4 + - 6 ) + cucarecu + id'
         //const input = '( a )'
@@ -95,9 +94,12 @@ const main = () => {
         //const input = '0 1'
         // const input = 'a b c'
 
+        const lexer = new Lexer()
         const tokens = lexer.tokenize(input)
+
         const grammar = parseGrammar(rawGrammarWithAction);
-        const parser = new Parser(tokens, transitionTable, grammar);
+
+        const parser = new SLRTableParser(tokens, transitionTable, grammar);
         parser.parse()
         console.log("Разбор успешно завершён!")
     } catch (error) {
