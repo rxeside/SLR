@@ -6,6 +6,7 @@ const SEPARATOR_SPACE = ' '
 const SYMBOL_EMPTY = 'e'
 const SYMBOL_END = '#'
 const SYMBOL_NIHIL = ''
+const SYMBOL_TILDE = '~'
 
 const STATE_START = '<Z>'
 const STATE_REDUCE = 'R'
@@ -18,6 +19,7 @@ export {
     SYMBOL_EMPTY,
     SYMBOL_END,
     SYMBOL_NIHIL,
+    SYMBOL_TILDE,
     STATE_START,
     STATE_REDUCE,
 }

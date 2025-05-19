@@ -1,6 +1,6 @@
 import {GrammarRule, Lexeme, Token, TransitionTable} from '@common/types'
 import {Stack} from '@common/stack'
-import {SEPARATOR_SPACE, STATE_REDUCE, STATE_START, SYMBOL_END} from '@common/consts'
+import {SEPARATOR_SPACE, STATE_REDUCE, STATE_START, SYMBOL_END, SYMBOL_TILDE} from '@common/consts'
 import {arrayEqual} from '@common/utils'
 
 type StackItem = {
@@ -107,30 +107,24 @@ class Parser {
     /** Возвращает правило для свёртки, если текущее действие - свёртка (R(n) или R(n)~action) **/
     private _findRuleForReduce(currAction: string[]): GrammarRule | null {
         const actionString = currAction[0];
-
         if (!actionString || actionString[0] !== STATE_REDUCE) {
             return null;
         }
 
         let ruleIndexPart = actionString.substring(1);
-
-        const tildePosition = ruleIndexPart.indexOf('~');
+        const tildePosition = ruleIndexPart.indexOf(SYMBOL_TILDE);
         if (tildePosition !== -1) {
             ruleIndexPart = ruleIndexPart.substring(0, tildePosition);
         }
 
         const ruleIndex = parseInt(ruleIndexPart, 10);
-
         if (isNaN(ruleIndex)) {
-            console.error(`Ошибка парсинга индекса правила из действия свёртки: ${actionString}`);
-            throw new Error(`Невалидный формат действия свёртки: ${actionString}. Не удалось извлечь индекс правила.`);
+            throw new Error(`Невалидный формат действия свёртки: ${actionString}. Не удалось извлечь индекс правила`);
         }
 
         const ruleForReduce = this.grammar[ruleIndex];
-
         if (!ruleForReduce) {
-            console.error(`Правило грамматики с индексом ${ruleIndex} не найдено (для действия ${actionString}).`);
-            throw new Error(`Правило грамматики с индексом ${ruleIndex} не найдено.`);
+            throw new Error(`Правило грамматики с индексом ${ruleIndex} не найдено`);
         }
 
         return ruleForReduce;
