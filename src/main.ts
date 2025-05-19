@@ -112,8 +112,11 @@ const main = () => {
         const grammar = parseGrammar(rawGrammarWithActionProcessed)
 
         const parser = new SLRTableParser(tokens, transitionTable, grammar);
-        parser.parse()
+        const finalSymbolTable = parser.parse();
         console.log("Разбор успешно завершён!")
+
+        finalSymbolTable.print();
+
     } catch (error) {
         console.log(error)
     }
