@@ -11,17 +11,17 @@ const main = () => {
         '<S> -> c'
     ]
     */
-    const rawGrammarWithAction = [
-        '<Z> -> <S> #',
-        '<S> -> <S> + <T> ~act_plus', // действие для сложения
-        '<S> -> <T>',
-        '<T> -> <T> * <F> ~act_mul',  // действие для умножения
-        '<T> -> <F>',
-        '<F> -> - <F> ~act_neg',     // действие для унарного минуса
-        '<F> -> ( <S> )',
-        '<F> -> id ~act_id',         // действие для идентификатора
-        '<F> -> num ~act_num',       // действие для числа
-    ];
+    // const rawGrammar = [
+    //     '<Z> -> <S> #',
+    //     '<S> -> <S> + <T> ~BinaryExpr', // действие для сложения
+    //     '<S> -> <T>',
+    //     '<T> -> <T> * <F> ~BinaryExpr',  // действие для умножения
+    //     '<T> -> <F>',
+    //     '<F> -> - <F> ~UnaryExpr',     // действие для унарного минуса
+    //     '<F> -> ( <S> )',
+    //     '<F> -> id ~act_id',         // действие для идентификатора
+    //     '<F> -> num ~act_num',       // действие для числа
+    // ];
 
     // const rawGrammar = [
     //     '<Z> -> <S> #',
@@ -79,29 +79,37 @@ const main = () => {
     //     '<C> -> c'
     // ]
 
+    const rawGrammar = [
+        '<Z> -> <S> # ~Program',
+        '<S> -> id + id ~BinaryExpr',
+        '<T> -> id ~Ident'
+    ];
 
-    const generator = new SLRTableGenerator(rawGrammarWithAction);
+    const generator = new SLRTableGenerator(rawGrammar);
 
     const transitionTable = generator.buildTable();
     console.log(transitionTable)
 
     try {
         //const input = '( a )'
-        const input = '- ( bombardiro + crocodilo ) * ( 4 + - 6 ) + cucarecu + id'
+        // const input = '- ( bombardiro + crocodilo ) * ( 4 + - 6 ) + cucarecu + id'
         //const input = '( a )'
         //const input = '( a , b )'
         //const input = 'begin d ; s end'
         //const input = '0 1'
         // const input = 'a b c'
+        const input = 'a + b'
+        const grammar = parseGrammar(rawGrammar);
+
 
         const lexer = new Lexer()
         const tokens = lexer.tokenize(input)
 
-        const grammar = parseGrammar(rawGrammarWithAction);
 
         const parser = new SLRTableParser(tokens, transitionTable, grammar);
         parser.parse()
-        console.log("Разбор успешно завершён!")
+
+
     } catch (error) {
         console.log(error)
     }

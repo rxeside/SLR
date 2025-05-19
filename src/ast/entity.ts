@@ -165,6 +165,7 @@ class ForStmt extends ASTNode {
 }
 
 export {
+    ASTNode,
     Program,
     Block,
     VarDecl,
