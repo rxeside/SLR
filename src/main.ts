@@ -1,9 +1,10 @@
 import {SLRTableGenerator, parseGrammar} from '@src/transitionTable/generator'
 import {SLRTableParser} from '@src/transitionTable/parser'
 import {Lexer} from '@src/lexer/lexer'
+import {removeEpsilonRulesFromGrammar} from './grammarProcessor'
 
 const main = () => {
-/*    const rawGrammar = [
+    /*    const rawGrammar = [
         '<Z> -> <S> #',
         '<S> -> a <S> b',
         '<S> -> a b',
@@ -11,17 +12,28 @@ const main = () => {
         '<S> -> c'
     ]
     */
-    const rawGrammarWithAction = [
-        '<Z> -> <S> #',
-        '<S> -> <S> + <T> ~act_plus', // действие для сложения
-        '<S> -> <T>',
-        '<T> -> <T> * <F> ~act_mul',  // действие для умножения
-        '<T> -> <F>',
-        '<F> -> - <F> ~act_neg',     // действие для унарного минуса
-        '<F> -> ( <S> )',
-        '<F> -> id ~act_id',         // действие для идентификатора
-        '<F> -> num ~act_num',       // действие для числа
-    ];
+    // const rawGrammarWithAction = [
+    //     '<Z> -> <S> #',
+    //     '<S> -> <S> + <T> ~act_plus', // действие для сложения
+    //     '<S> -> <T>',
+    //     '<T> -> <T> * <F> ~act_mul',  // действие для умножения
+    //     '<T> -> <F>',
+    //     '<F> -> - <F> ~act_neg',     // действие для унарного минуса
+    //     '<F> -> ( <S> )',
+    //     '<F> -> id ~act_id',         // действие для идентификатора
+    //     '<F> -> num ~act_num',       // действие для числа
+    // ]
+
+    // const rawGrammarWithoutEpsilon = [
+    //     'Z -> E #',
+    //     'E -> ( )', 
+    //     'E -> ( E B )',
+    //     'E -> A ',
+    //     'B -> , E B',
+    //     'B -> e',
+    //     'A -> a',
+    //     'A -> b',
+    // ]
 
     // const rawGrammar = [
     //     '<Z> -> <S> #',
@@ -79,8 +91,8 @@ const main = () => {
     //     '<C> -> c'
     // ]
 
-
-    const generator = new SLRTableGenerator(rawGrammarWithAction);
+    const rawGrammarWithActionProcessed = removeEpsilonRulesFromGrammar(rawGrammarWithAction)
+    const generator = new SLRTableGenerator(rawGrammarWithActionProcessed)
 
     const transitionTable = generator.buildTable();
     console.log(transitionTable)
@@ -97,7 +109,7 @@ const main = () => {
         const lexer = new Lexer()
         const tokens = lexer.tokenize(input)
 
-        const grammar = parseGrammar(rawGrammarWithAction);
+        const grammar = parseGrammar(rawGrammarWithActionProcessed)
 
         const parser = new SLRTableParser(tokens, transitionTable, grammar);
         parser.parse()
