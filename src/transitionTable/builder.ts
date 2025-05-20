@@ -6,7 +6,7 @@ const SYMBOL_END = '#';
 type FollowSets = Record<string, Set<string>>;
 type FirstSets = Record<string, Set<string>>;
 
-class SLRTableGenerator {
+class SLRTableBuilder {
     private rules: GrammarRule[];
     private nonTerminals: Set<string>;
     private startSymbol: string;
@@ -458,6 +458,6 @@ function parseGrammar(raw: string[]): GrammarRule[] {
 }
 
 export {
-    SLRTableGenerator,
+    SLRTableBuilder,
     parseGrammar,
 };

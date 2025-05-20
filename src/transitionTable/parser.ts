@@ -2,7 +2,8 @@ import {GrammarRule, Lexeme, Token, TransitionTable} from '@common/types'
 import {Stack} from '@common/stack'
 import {SEPARATOR_SPACE, STATE_REDUCE, STATE_START, SYMBOL_END, SYMBOL_TILDE} from '@common/consts'
 import {arrayEqual} from '@common/utils'
-import {ASTNode, BinaryExpr, Identifier, Literal, Program} from '@src/ast/entity'
+import {ASTNode, Identifier, Literal} from '@src/ast/entity'
+import {ASTBuilder} from '@src/ast/builder'
 
 type StackItem = {
     symbol: string,
@@ -206,9 +207,8 @@ class SLRTableParser {
         }
         // console.log(`Reduce by ${left} -> ${right.join(' ')} ~${actionName || ''}. Children from astStack:`, astChildren);
 
-        console.log({insertionName})
         if (insertionName) {
-            const newNode = this._createASTNode(insertionName, astChildren, rule);
+            const newNode = ASTBuilder.buildNode(insertionName, astChildren, rule);
             console.log({newNode})
             this.astStack.push(newNode);
         } else if (astChildren.length === 1 && astChildren[0] instanceof ASTNode) {
@@ -235,62 +235,6 @@ class SLRTableParser {
         }
     }
 
-    private _createASTNode(actionName: string, children: (ASTNode | Token)[], rule: GrammarRule): ASTNode {
-        // console.log(`_createASTNode: action=${actionName}, children=`, children.map(c => c instanceof ASTNode ? c.constructor.name : c));
-        switch (actionName) {
-            case 'Program':
-                // Expects an array of statement ASTNodes
-                // If <S> is the start symbol for statements
-                // And Z -> <S> # ~Program, then children will contain the ASTNode for <S>
-                // If Z -> <block_of_statements> # ~Program, children = [BlockNode]
-                const statements = children.filter(c => c instanceof ASTNode) as ASTNode[];
-                return new Program(statements);
-
-            case 'BinaryExpr':
-                // For a rule like <E> -> <E> + <T> ~BinaryExpr
-                // children should be [ENode, PlusToken, TNode]
-                if (children.length === 3 &&
-                    children[0] instanceof ASTNode &&
-                    !(children[1] instanceof ASTNode) && // child[1] is a Token (operator)
-                    children[2] instanceof ASTNode) {
-                    const left = children[0] as ASTNode;
-                    const operator = (children[1] as Token).lexeme;
-                    const right = children[2] as ASTNode;
-                    return new BinaryExpr(left, operator, right);
-                }
-                    // For a rule like <S> -> id + id ~BinaryExpr
-                // children should be [IdentifierNode, PlusToken, IdentifierNode]
-                else if (children.length === 3 &&
-                    children[0] instanceof Identifier &&
-                    !(children[1] instanceof ASTNode) && // Token
-                    children[2] instanceof Identifier) {
-                    const left = children[0] as Identifier;
-                    const operator = (children[1] as Token).lexeme;
-                    const right = children[2] as Identifier;
-                    return new BinaryExpr(left, operator, right);
-                }
-                throw new Error(
-                    `Invalid children for BinaryExpr action. Rule: ${rule.left} -> ${rule.right.join(' ')}. Children: ${JSON.stringify(children.map(c => c instanceof ASTNode ? c.constructor.name : c))}`
-                );
-
-            case 'Ident':
-                // For a rule like <T> -> id ~Ident
-                // children should be [IdentifierNode] (already created by _handleInsertion)
-                if (children.length === 1 && children[0] instanceof Identifier) {
-                    return children[0];
-                }
-                throw new Error(`Invalid children for Ident action. Expected IdentifierNode. Got: ${JSON.stringify(children)}`);
-
-            // Add more cases for other AST node types based on your grammar actions
-            // E.g. case 'VarDecl':
-            // E.g. case 'Assignment':
-            // E.g. case 'IfStatement':
-
-            default:
-                throw new Error(`Unknown AST action name: ${actionName}`);
-        }
-    }
-
     /** Проверяет, успешно ли завершился разбор **/
     private _verifyCompletedCorrectly() {
         if (this.stack.isEmpty() ||
@@ -305,9 +249,7 @@ class SLRTableParser {
         }
 
         if (this.astStack.size() !== 1) {
-            console.warn(`AST stack has ${this.astStack.size()} items at the end of parsing. Expected 1 (the root node). AST Stack:`, this.astStack.toArray());
-            // Depending on strictness, this could be an error.
-            // throw new Error('AST stack should contain exactly one root node at the end of parsing.');
+            throw new Error(`AST стек имеет ${this.astStack.size()} элементов. Ожидался один элемент (root). AST стек: ${this.astStack.toArray()}`);
         }
         console.log("Разбор успешно завершён!")
     }

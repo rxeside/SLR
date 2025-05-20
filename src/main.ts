@@ -1,4 +1,4 @@
-import {SLRTableGenerator, parseGrammar} from '@src/transitionTable/generator'
+import {SLRTableBuilder, parseGrammar} from '@src/transitionTable/builder'
 import {SLRTableParser} from '@src/transitionTable/parser'
 import {Lexer} from '@src/lexer/lexer'
 
@@ -85,9 +85,9 @@ const main = () => {
         '<T> -> id ~Ident'
     ];
 
-    const generator = new SLRTableGenerator(rawGrammar);
+    const builder = new SLRTableBuilder(rawGrammar);
 
-    const transitionTable = generator.buildTable();
+    const transitionTable = builder.buildTable();
     console.log(transitionTable)
 
     try {
