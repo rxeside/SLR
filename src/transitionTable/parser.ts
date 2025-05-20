@@ -5,6 +5,10 @@ import {arrayEqual} from '@common/utils'
 import {ASTNode, Identifier, Literal} from '@src/ast/entity'
 import {ASTBuilder} from '@src/ast/builder'
 
+type ASTStackItem = ASTNode | Token
+
+type ASTChildren = ASTStackItem[]
+
 type StackItem = {
     symbol: string,
     state: string,
@@ -21,7 +25,7 @@ type QueueItem = {
 
 type ReduceInfo = {
     rule: GrammarRule;
-    insertionName?: string;
+    insertionName: string;
 };
 
 const TOKEN_TYPE_TO_GRAMMAR_SYMBOL_MAP: Partial<Record<Lexeme, string>> = {
@@ -37,7 +41,7 @@ class SLRTableParser {
     private readonly grammar: GrammarRule[]
 
     /** Рабочие переменные **/
-    private astStack: Stack<ASTNode | Token>
+    private astStack: Stack<ASTStackItem>
     private stack: Stack<StackItem>
     private inputQueue: QueueItem[]
     private currToken: QueueItem
@@ -64,18 +68,18 @@ class SLRTableParser {
             const currAction = this._shift()
             // console.log('shift ', {currAction})
 
-            const ruleForReduce = this._findRuleForReduce(currAction)
-            if (ruleForReduce === null) {
+            const reduceInfo = this._findRuleForReduce(currAction)
+            if (reduceInfo === null) {
                 this.stack.push({
                     symbol: this.currToken.grammarSymbol,
                     state: currAction.join(SEPARATOR_SPACE)
                 })
                 // console.log(JSON.stringify({stack: this.stack.toArray()}, null, 2))
-                this._handleInsertion(this.currToken)
+                this._addSimpleToAST(this.currToken)
                 continue
             }
 
-            this._reduceByGrammarRule(ruleForReduce, controlObj)
+            this._reduceByGrammarRule(reduceInfo, controlObj)
             // console.log('reduce')
             // console.log(JSON.stringify({queue: this.inputQueue}, null, 2))
             // console.log(JSON.stringify({stack: this.stack.toArray()}, null, 2))
@@ -114,29 +118,7 @@ class SLRTableParser {
         return currAction
     }
 
-    private _handleInsertion(shiftedTokenItem: QueueItem): void {
-        const token = shiftedTokenItem.token
-        switch (token.type) {
-            case Lexeme.IDENTIFIER:
-                this.astStack.push(new Identifier(token.lexeme))
-                break
-            case Lexeme.INTEGER:
-                this.astStack.push(new Literal(parseInt(token.lexeme, 10)))
-                break
-            case Lexeme.FLOAT:
-                this.astStack.push(new Literal(parseFloat(token.lexeme)))
-                break
-            default:
-                if (token.type !== Lexeme.EOF && token.lexeme !== SYMBOL_END) {
-                    if (['+', '-', '*', '/'].includes(token.lexeme)) {
-                        this.astStack.push(token)
-                    }
-                }
-                break
-        }
-    }
-
-    /** Возвращает правило для свёртки, если текущее действие - свёртка (R(n) или R(n)~action) **/
+    /** Возвращает правило для свёртки, если текущее действие - свёртка (R(n) или R(n)~insertion) **/
     private _findRuleForReduce(currAction: string[]): ReduceInfo | null {
         const actionString = currAction[0]
         if (!actionString || actionString[0] !== STATE_REDUCE) {
@@ -144,7 +126,7 @@ class SLRTableParser {
         }
 
         let ruleIndexPart = actionString.substring(1)
-        let insertionName: string | undefined = undefined
+        let insertionName: string
         const tildePosition = ruleIndexPart.indexOf(SYMBOL_TILDE)
         if (tildePosition !== -1) {
             insertionName = ruleIndexPart.substring(tildePosition + 1)
@@ -164,56 +146,78 @@ class SLRTableParser {
         return { rule: ruleForReduce, insertionName }
     }
 
+    /** Вставляет в AST примитивные узлы или токены, которые потом используются для больших узлов **/
+    private _addSimpleToAST(shiftedTokenItem: QueueItem): void {
+        const token = shiftedTokenItem.token
+        switch (token.type) {
+            case Lexeme.IDENTIFIER:
+                this.astStack.push(new Identifier(token.lexeme))
+                break
+            case Lexeme.INTEGER:
+                this.astStack.push(new Literal(parseInt(token.lexeme, 10)))
+                break
+            case Lexeme.FLOAT:
+                this.astStack.push(new Literal(parseFloat(token.lexeme)))
+                break
+            default:
+                if (token.type !== Lexeme.EOF && token.lexeme !== SYMBOL_END) {
+                    if (['+', '-', '*', '/', '(', ')', '#'].includes(token.lexeme)) {
+                        this.astStack.push(token)
+                    }
+                }
+                break
+        }
+    }
+
     /** Свёртка по конкретному правилу **/
     private _reduceByGrammarRule(reduceInfo: ReduceInfo, controlObj: ControlObj) {
-        const { rule, insertionName } = reduceInfo
-        const { left, right } = rule
-        const stackSymbolArr: string[] = this.stack.toArray().map(item => item.symbol)
-        const n = right.length
+        const { rule } = reduceInfo
+        const { left } = rule
 
-        if (n <= 0 ||
-            stackSymbolArr.length < n ||
-            !arrayEqual(stackSymbolArr.slice(-n), right)
-        ) {
-            throw new Error('Таблица неверно составлена: стек неправильно заполняется')
-        }
-
-        for (let k = 0; k < n; k++) {
-            this.stack.pop()
-        }
-        this.inputQueue.unshift(this.currToken)
-        this.inputQueue.unshift({grammarSymbol: left, token: {} as Token})
-
+        this._verifyCanReduce(rule)
         if (left === STATE_START) {
             controlObj.isEnd = true
         }
 
-        const astChildren: (ASTNode | Token)[] = [];
-        if (n > 0) { // Only pop from astStack if RHS is not empty
-            for (let k = 0; k < n; k++) {
-                if (this.astStack.isEmpty()) {
-                    // This can happen if a grammar symbol on RHS didn't push anything to astStack
-                    // (e.g., structural punctuation that isn't part of an AST node's data)
-                    // Or if an epsilon production is involved for one of the RHS symbols.
-                    // This needs careful grammar design.
-                    console.warn(`AST stack empty while expecting child for rule ${rule.ruleIndex}: ${left} -> ${right.join(' ')}. RHS symbol: ${right[n-1-k]}`);
-                    // Decide what to do: push a placeholder, skip, or error
-                    // For now, let's assume valid grammar pushes something or action handles it.
-                } else {
-                    astChildren.push(this.astStack.pop()!);
-                }
+        const astChildren: ASTChildren = this._pop(reduceInfo)
+        this._addToAST(reduceInfo, astChildren)
+
+        this.inputQueue.unshift(this.currToken)
+        this.inputQueue.unshift({grammarSymbol: left, token: {} as Token})
+    }
+
+    /** Вырезает из стека и AST-стека элементы для свёртки, элементы из AST-стека возвращает **/
+    private _pop(reduceInfo: ReduceInfo): ASTChildren {
+        const {rule, insertionName} = reduceInfo
+
+
+        const astChildren: ASTChildren = []
+        for (let k = 0; k < rule.right.length; k++) {
+            const stackItem = this.stack.pop()
+            if (stackItem.symbol === SYMBOL_END) {
+                continue
             }
-            astChildren.reverse(); // Children were popped in reverse order of RHS
+            if (this.astStack.isEmpty()) {
+                throw new Error(`AST stack empty while expecting child for rule ${rule.ruleIndex}: ${rule.left} -> ${rule.right.join(' ')}. RHS symbol: ${rule.right[rule.right.length-1-k]}`)
+            } else {
+                astChildren.push(this.astStack.pop()!)
+            }
         }
-        // console.log(`Reduce by ${left} -> ${right.join(' ')} ~${actionName || ''}. Children from astStack:`, astChildren);
+        astChildren.reverse()
+        console.log(`Reduce by ${rule.left} -> ${rule.right.join(' ')} ~${insertionName || ''}. Children from astStack:`, astChildren)
+
+        return astChildren
+    }
+
+    /** Вставка в AST **/
+    private _addToAST(reduceInfo: ReduceInfo, astChildren: ASTStackItem[]) {
+        const {rule, insertionName} = reduceInfo
+        const {left, right} = rule
 
         if (insertionName) {
             const newNode = ASTBuilder.buildNode(insertionName, astChildren, rule);
-            console.log({newNode})
-            this.astStack.push(newNode);
+            this.astStack.push(newNode)
         } else if (astChildren.length === 1 && astChildren[0] instanceof ASTNode) {
-            // If no action name, but RHS reduced to a single ASTNode (e.g. E -> T),
-            // propagate that node up.
             this.astStack.push(astChildren[0]);
         } else if (astChildren.length > 0) {
             // Multiple children but no action name. What to do?
@@ -235,6 +239,20 @@ class SLRTableParser {
         }
     }
 
+    /** Проверяет, можно ли свернуться **/
+    private _verifyCanReduce(rule: GrammarRule) {
+        const { right } = rule
+        const stackSymbolArr: string[] = this.stack.toArray().map(item => item.symbol)
+        const n = right.length
+
+        if (n <= 0 ||
+            stackSymbolArr.length < n ||
+            !arrayEqual(stackSymbolArr.slice(-n), right)
+        ) {
+            throw new Error('Таблица неверно составлена: стек неправильно заполняется')
+        }
+    }
+
     /** Проверяет, успешно ли завершился разбор **/
     private _verifyCompletedCorrectly() {
         if (this.stack.isEmpty() ||
@@ -251,6 +269,7 @@ class SLRTableParser {
         if (this.astStack.size() !== 1) {
             throw new Error(`AST стек имеет ${this.astStack.size()} элементов. Ожидался один элемент (root). AST стек: ${this.astStack.toArray()}`);
         }
+
         console.log("Разбор успешно завершён!")
     }
 }

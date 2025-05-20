@@ -81,7 +81,7 @@ const main = () => {
 
     const rawGrammar = [
         '<Z> -> <S> # ~Program',
-        '<S> -> id + id ~BinaryExpr',
+        '<S> -> <T> + <T> ~BinaryExpr',
         '<T> -> id ~Ident'
     ];
 
@@ -108,8 +108,6 @@ const main = () => {
 
         const parser = new SLRTableParser(tokens, transitionTable, grammar);
         parser.parse()
-
-
     } catch (error) {
         console.log(error)
     }
