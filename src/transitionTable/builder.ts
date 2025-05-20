@@ -1,7 +1,5 @@
 import { GrammarRule, State, TransitionTable } from '@common/types';
-
-const SEPARATOR_SPACED_FALLOW = ' -> ';
-const SYMBOL_END = '#';
+import {SEPARATOR_SPACED_FALLOW, SYMBOL_END} from "@common/consts";
 
 type FollowSets = Record<string, Set<string>>;
 type FirstSets = Record<string, Set<string>>;
