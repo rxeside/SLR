@@ -48,22 +48,23 @@ const main = () => {
     // ]
     // const rawGrammar = [
     //     '<Z> -> <PROG> #',
-    //     '<PROG> -> begin d ; <X> end',
-    //     '<X> -> d ; <X>',
-    //     '<X> -> s <Y>',
-    //     '<X> -> s',
-    //     '<Y> -> ; s <Y>',
-    //     '<Y> -> ; s'
+    //     '<PROG> -> id id ; <X> id',
+    //     '<X> -> id ; <X>',
+    //     '<X> -> id <Y>',
+    //     '<X> -> id',
+    //     '<Y> -> ; id <Y>',
+    //     '<Y> -> ; id'
     // ]
+
     // const rawGrammar = [
     //     '<Z> -> <A> #',
     //     '<Z> -> #',
-    //     '<A> -> 0 <A>',
-    //     '<A> -> 0',
-    //     '<A> -> 1 <A>',
-    //     '<A> -> 1',
-    //     '<A> -> 2 <A>',
-    //     '<A> -> 2'
+    //     '<A> -> num <A>',
+    //     '<A> -> num',
+    //     '<A> -> num <A>',
+    //     '<A> -> num',
+    //     '<A> -> num <A>',
+    //     '<A> -> num'
     // ]
     // const rawGrammar = [
     //     '<Z> -> <S> #',
@@ -71,12 +72,12 @@ const main = () => {
     //     '<S> -> <B> <C>',
     //     '<S> -> <A> <C>',
     //     '<S> -> <A> <B>',
-    //     '<A> -> <A> a',
-    //     '<A> -> a',
-    //     '<B> -> b <B>',
-    //     '<B> -> b',
-    //     '<C> -> <C> c',
-    //     '<C> -> c'
+    //     '<A> -> <A> id',
+    //     '<A> -> id',
+    //     '<B> -> id <B>',
+    //     '<B> -> id',
+    //     '<C> -> <C> id',
+    //     '<C> -> id'
     // ]
 
 
@@ -93,7 +94,7 @@ const main = () => {
         //const input = '( a , b )'
         //const input = 'begin d ; s end'
         //const input = '0 1'
-        // const input = 'a b c'
+        //const input = 'a b c'
 
         const tokens = lexer.tokenize(input)
         const grammar = parseGrammar(rawGrammarWithAction);
