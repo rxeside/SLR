@@ -84,7 +84,7 @@ const main = () => {
 
     const rawGrammar = [
         '<Z> -> <S> # ~Program',
-        '<S> -> id + id ~BinaryExpr',
+        '<S> -> <T> + <T> ~BinaryExpr',
         '<T> -> id ~Ident'
     ];
 
