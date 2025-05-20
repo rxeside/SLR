@@ -4,6 +4,8 @@ import {SEPARATOR_SPACE, STATE_REDUCE, STATE_START, SYMBOL_END, SYMBOL_TILDE} fr
 import {arrayEqual} from '@common/utils'
 import {ASTNode, Identifier, Literal} from '@src/ast/entity'
 import {ASTBuilder} from '@src/ast/builder'
+import {ErrorCode} from "@src/errors/errorCodes";
+import {CompilerError} from "@src/errors/CompilerError";
 
 type StackItem = {
     symbol: string,
@@ -108,8 +110,13 @@ class SLRTableParser {
 
         const currAction = this.table[this.currState]?.[this.currToken.grammarSymbol]
         if (!currAction || currAction.length === 0) {
-            throw new Error(`Нет перехода из состояния '${this.currState}' по символу '${this.currToken.grammarSymbol}' (оригинальный токен: '${this.currToken.token.lexeme}' типа ${this.currToken.token.type})`)
-        }
+            throw new CompilerError(ErrorCode.PARSER_NO_TRANSITION, {
+                currentState: this.currState,
+                offendingSymbol: this.currToken.grammarSymbol,
+                message: this.currToken.token.lexeme,
+                lineNumber: this.currToken.token.position.line,
+                columnNumber: this.currToken.token.position.column,
+            });        }
 
         return currAction
     }
@@ -153,12 +160,12 @@ class SLRTableParser {
 
         const ruleIndex = parseInt(ruleIndexPart, 10)
         if (isNaN(ruleIndex)) {
-            throw new Error(`Невалидный формат действия свёртки: ${actionString}. Не удалось извлечь индекс правила`)
+            throw new CompilerError(ErrorCode.PARSER_INVALID_REDUCE_ACTION, { message: actionString });
         }
 
         const ruleForReduce = this.grammar[ruleIndex]
         if (!ruleForReduce) {
-            throw new Error(`Правило грамматики с индексом ${ruleIndex} не найдено`)
+            throw new CompilerError(ErrorCode.PARSER_GRAMMAR_RULE_NOT_FOUND, { message: ruleIndex.toString() });
         }
 
         return { rule: ruleForReduce, insertionName }
@@ -175,7 +182,7 @@ class SLRTableParser {
             stackSymbolArr.length < n ||
             !arrayEqual(stackSymbolArr.slice(-n), right)
         ) {
-            throw new Error('Таблица неверно составлена: стек неправильно заполняется')
+            throw new CompilerError(ErrorCode.PARSER_STACK_MISMATCH, { ruleText: `${left} -> ${right.join(' ')}` });
         }
 
         for (let k = 0; k < n; k++) {

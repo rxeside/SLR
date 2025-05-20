@@ -1,5 +1,7 @@
 import { GrammarRule, State, TransitionTable } from '@common/types';
 import {SEPARATOR_SPACED_FALLOW, SYMBOL_END} from "@common/consts";
+import { ErrorCode } from '@src/errors/errorCodes';
+import { CompilerError } from '@src/errors/CompilerError';
 
 type FollowSets = Record<string, Set<string>>;
 type FirstSets = Record<string, Set<string>>;
@@ -14,13 +16,16 @@ class SLRTableBuilder {
     private table: TransitionTable;
 
     constructor(rawGrammar: string[]) {
+        if (!rawGrammar || rawGrammar.length === 0) {
+            throw new CompilerError(ErrorCode.BUILDER_EMPTY_GRAMMAR);
+        }
         this.rules = this._parseGrammar(rawGrammar);
         this.nonTerminals = new Set(this.rules.map(r => r.left));
         this.startSymbol = this.rules[0]?.left || '<Z>'; // Default start symbol
         this.firstSets = this._calculateFirstSets();
         this.followSets = this._calculateFollowSets();
         this.symbolToRules = this._mapSymbolsToRules();
-        this.table = {}; // Initialize an empty table
+        this.table = {};
     }
 
     public buildTable(): TransitionTable {
@@ -138,7 +143,9 @@ class SLRTableBuilder {
         if (followSets[this.startSymbol]) {
             followSets[this.startSymbol].add(SYMBOL_END);
         } else {
-            console.warn(`Start symbol ${this.startSymbol} not found in non-terminals for FOLLOW set init.`);
+            throw new CompilerError(ErrorCode.BUILDER_START_SYMBOL_NOT_FOUND_IN_FOLLOW, {
+                offendingSymbol: this.startSymbol
+            });
         }
 
         let changed = true;
@@ -325,9 +332,20 @@ class SLRTableBuilder {
                                         if (newTransitions[followSymbol].length > 0) {
                                             const existingAction = newTransitions[followSymbol][0];
                                             if (!existingAction.startsWith('R') && existingAction !== reduceAction) {
-                                                console.error(`КОНФЛИКТ Shift/Reduce в состоянии ${mergedKey} по символу ${followSymbol}: Обнаружен Shift ${existingAction}, попытка добавить Reduce ${reduceAction} из состояния ${targetStateName}`);
-                                            } else if (existingAction.startsWith('R') && existingAction !== reduceAction) {
-                                                console.error(`КОНФЛИКТ Reduce/Reduce в состоянии ${mergedKey} по символу ${followSymbol}: Обнаружен ${existingAction}, попытка добавить ${reduceAction} из состояния ${targetStateName}`);
+                                                throw new CompilerError(ErrorCode.BUILDER_SHIFT_REDUCE_CONFLICT, {
+                                                    stateName: mergedKey,
+                                                    offendingSymbol: followSymbol,
+                                                    conflictingAction1: existingAction, // Shift
+                                                    conflictingAction2: reduceAction    // Reduce
+                                                });
+                                            }
+                                            else if (existingAction.startsWith('R') && existingAction !== reduceAction) {
+                                                throw new CompilerError(ErrorCode.BUILDER_REDUCE_REDUCE_CONFLICT, {
+                                                    stateName: mergedKey,
+                                                    offendingSymbol: followSymbol,
+                                                    conflictingAction1: existingAction,
+                                                    conflictingAction2: reduceAction
+                                                });
                                             }
                                         }
                                         // Add Reduce only if no Shift action exists or no other Reduce action
@@ -377,8 +395,11 @@ class SLRTableBuilder {
                 }
 
                 if (ruleIndex < 0 || ruleIndex >= this.rules.length) {
-                    console.warn(`Invalid ruleIndex ${ruleIndex} parsed from state name ${stateName} in final processing loop.`);
-                    continue;
+                    throw new CompilerError(ErrorCode.BUILDER_INVALID_RULE_INDEX_IN_STATE_NAME, {
+                        offendingSymbol: ruleIndex.toString(),
+                        stateName: stateName
+                    });
+                    // continue;
                 }
                 const rule = this.rules[ruleIndex];
 

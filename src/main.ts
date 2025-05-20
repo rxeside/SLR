@@ -1,6 +1,9 @@
 import {SLRTableBuilder, parseGrammar} from '@src/transitionTable/builder'
 import {SLRTableParser} from '@src/transitionTable/parser'
 import {Lexer} from '@src/lexer/lexer'
+import {ErrorReporter} from "@src/errors/ErrorReporter";
+import {CompilerError} from "@src/errors/CompilerError";
+import {ErrorCode} from "@src/errors/errorCodes";
 
 const main = () => {
 /*    const rawGrammar = [
@@ -85,12 +88,15 @@ const main = () => {
         '<T> -> id ~Ident'
     ];
 
-    const builder = new SLRTableBuilder(rawGrammar);
+    const errorReporter = new ErrorReporter();
 
-    const transitionTable = builder.buildTable();
-    console.log(transitionTable)
+
 
     try {
+        const builder = new SLRTableBuilder(rawGrammar);
+
+        const transitionTable = builder.buildTable();
+        console.log(transitionTable)
         //const input = '( a )'
         // const input = '- ( bombardiro + crocodilo ) * ( 4 + - 6 ) + cucarecu + id'
         //const input = '( a )'
@@ -109,7 +115,29 @@ const main = () => {
         const parser = new SLRTableParser(tokens, transitionTable, grammar);
         parser.parse()
     } catch (error) {
-        console.log(error)
+        //console.log(error)
+        if (error instanceof CompilerError) {
+            errorReporter.report(error);
+        } else if (error instanceof Error) {
+            // Для других неожиданных ошибок
+            errorReporter.report(new CompilerError(ErrorCode.GENERAL_UNEXPECTED_ERROR, { message: error.message }));
+        } else {
+            // Совсем неизвестная ошибка
+            errorReporter.report(new CompilerError(ErrorCode.GENERAL_UNEXPECTED_ERROR, { message: 'Произошла неизвестная ошибка.' }));
+        }
+    } finally { // <--- БЛОК FINALLY
+        if (errorReporter.hasErrors()) {
+            console.log("\nКомпиляция завершилась с ошибками.");
+            // errorReporter.printCollectedErrors(); // Можно вывести все собранные ошибки в конце
+        } else {
+            // Этот блок выполнится, только если не было выброшено исключение из try
+            // или если исключение было поймано и обработано без re-throw.
+            // Если parse() успешен, сообщение "Разбор успешно завершен!" выводится изнутри парсера.
+            // Но если была ошибка билдера, то сюда мы попадем.
+            if (!errorReporter.hasErrors()) { // Дополнительная проверка, т.к. parse() мог завершиться без ошибок
+                console.log("Компиляция успешно завершена!");
+            }
+        }
     }
 }
 
