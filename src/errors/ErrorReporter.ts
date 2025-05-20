@@ -12,79 +12,76 @@ export class ErrorReporter {
         this.errorMessages = new Map();
         this.errorCount = 0;
         this.collectedErrors = [];
-        this._initializeErrorMessages();
-    }
+        this.errorMessages = new Map<ErrorCode, string | ErrorMessageFormatter>([
+            // Лексер
+            [
+                ErrorCode.LEXER_UNEXPECTED_CHAR,
+                (ctx) => `Неожиданный символ '${ctx.offendingSymbol}'`
+            ],
+            [
+                ErrorCode.LEXER_UNTERMINATED_STRING,
+                (ctx) => `Незавершенная строка, начавшаяся` // Можно добавить ctx.lineNumber, если он есть
+            ],
+            // ... (добавьте сюда ВСЕ остальные ошибки из вашего _initializeErrorMessages)
 
-    private _initializeErrorMessages(): void {
-        // Лексер
-        this.errorMessages.set(
-            ErrorCode.LEXER_UNEXPECTED_CHAR,
-            (ctx) => `Неожиданный символ '${ctx.offendingSymbol}'`
-        );
-        this.errorMessages.set(
-            ErrorCode.LEXER_UNTERMINATED_STRING,
-            (ctx) => `Незавершенная строка, начавшаяся`
-        );
+            // Парсер
+            [
+                ErrorCode.PARSER_UNEXPECTED_TOKEN,
+                (ctx) => `Неожиданный токен '${ctx.offendingSymbol}'. ${ctx.expectedToken ? `Ожидался: ${ctx.expectedToken}.` : ''}`
+            ],
+            [
+                ErrorCode.PARSER_NO_TRANSITION,
+                (ctx) => `Синтаксическая ошибка: нет перехода из состояния '${ctx.currentState}' по символу '${ctx.offendingSymbol}' (токен: '${ctx.message}')`
+            ],
+            [
+                ErrorCode.PARSER_GRAMMAR_RULE_NOT_FOUND,
+                (ctx) => `Внутренняя ошибка: правило грамматики с индексом ${ctx.message} не найдено.`
+            ],
+            [
+                ErrorCode.PARSER_INVALID_REDUCE_ACTION,
+                (ctx) => `Внутренняя ошибка: невалидный формат действия свёртки '${ctx.message}'.`
+            ],
+            [
+                ErrorCode.PARSER_STACK_MISMATCH,
+                (ctx) => `Внутренняя ошибка построителя таблицы: несоответствие стека при свёртке правила '${ctx.ruleText}'.`
+            ],
+            [
+                ErrorCode.PARSER_INCOMPLETE_PARSE,
+                (ctx) => `Синтаксическая ошибка: разбор завершился некорректно. ${ctx.message || ''}`
+            ],
+            [
+                ErrorCode.PARSER_AST_STACK_ERROR,
+                (ctx) => `Ошибка построения AST: ${ctx.message}`
+            ],
 
-        // Парсер
-        this.errorMessages.set(
-            ErrorCode.PARSER_UNEXPECTED_TOKEN,
-            (ctx) => `Неожиданный токен '${ctx.offendingSymbol}'. ${ctx.expectedToken ? `Ожидался: ${ctx.expectedToken}.` : ''}`
-        );
-        this.errorMessages.set(
-            ErrorCode.PARSER_NO_TRANSITION,
-            (ctx) => `Синтаксическая ошибка: нет перехода из состояния '${ctx.currentState}' по символу '${ctx.offendingSymbol}' (токен: '${ctx.message}')`
-        );
-        this.errorMessages.set(
-            ErrorCode.PARSER_GRAMMAR_RULE_NOT_FOUND,
-            (ctx) => `Внутренняя ошибка: правило грамматики с индексом ${ctx.message} не найдено.`
-        );
-        this.errorMessages.set(
-            ErrorCode.PARSER_INVALID_REDUCE_ACTION,
-            (ctx) => `Внутренняя ошибка: невалидный формат действия свёртки '${ctx.message}'.`
-        );
-        this.errorMessages.set(
-            ErrorCode.PARSER_STACK_MISMATCH,
-            (ctx) => `Внутренняя ошибка построителя таблицы: несоответствие стека при свёртке правила '${ctx.ruleText}'.`
-        );
-        this.errorMessages.set(
-            ErrorCode.PARSER_INCOMPLETE_PARSE,
-            (ctx) => `Синтаксическая ошибка: разбор завершился некорректно. ${ctx.message || ''}`
-        );
-        this.errorMessages.set(
-            ErrorCode.PARSER_AST_STACK_ERROR,
-            (ctx) => `Ошибка построения AST: ${ctx.message}`
-        );
+            // Построитель таблицы
+            [
+                ErrorCode.BUILDER_EMPTY_GRAMMAR,
+                "Грамматика не может быть пустой."
+            ],
+            [
+                ErrorCode.BUILDER_SHIFT_REDUCE_CONFLICT,
+                (ctx) => `Конфликт Shift/Reduce в состоянии '${ctx.stateName}' по символу '${ctx.offendingSymbol}'. Обнаружен Shift (${ctx.conflictingAction1}), попытка добавить Reduce (${ctx.conflictingAction2}).`
+            ],
+            [
+                ErrorCode.BUILDER_REDUCE_REDUCE_CONFLICT,
+                (ctx) => `Конфликт Reduce/Reduce в состоянии '${ctx.stateName}' по символу '${ctx.offendingSymbol}'. Обнаружен Reduce (${ctx.conflictingAction1}), попытка добавить Reduce (${ctx.conflictingAction2}).`
+            ],
+            [
+                ErrorCode.BUILDER_START_SYMBOL_NOT_FOUND_IN_FOLLOW,
+                (ctx) => `Стартовый символ '${ctx.offendingSymbol}' не найден в нетерминалах для инициализации FOLLOW-множеств.`
+            ],
+            [
+                ErrorCode.BUILDER_INVALID_RULE_INDEX_IN_STATE_NAME,
+                (ctx) => `Внутренняя ошибка: невалидный индекс правила ${ctx.offendingSymbol} извлечен из имени состояния '${ctx.stateName}'.`
+            ],
 
-
-        // Построитель таблицы
-        this.errorMessages.set(
-            ErrorCode.BUILDER_EMPTY_GRAMMAR,
-            "Грамматика не может быть пустой."
-        );
-        this.errorMessages.set(
-            ErrorCode.BUILDER_SHIFT_REDUCE_CONFLICT,
-            (ctx) => `Конфликт Shift/Reduce в состоянии '${ctx.stateName}' по символу '${ctx.offendingSymbol}'. Обнаружен Shift (${ctx.conflictingAction1}), попытка добавить Reduce (${ctx.conflictingAction2}).`
-        );
-        this.errorMessages.set(
-            ErrorCode.BUILDER_REDUCE_REDUCE_CONFLICT,
-            (ctx) => `Конфликт Reduce/Reduce в состоянии '${ctx.stateName}' по символу '${ctx.offendingSymbol}'. Обнаружен Reduce (${ctx.conflictingAction1}), попытка добавить Reduce (${ctx.conflictingAction2}).`
-        );
-        this.errorMessages.set(
-            ErrorCode.BUILDER_START_SYMBOL_NOT_FOUND_IN_FOLLOW,
-            (ctx) => `Стартовый символ '${ctx.offendingSymbol}' не найден в нетерминалах для инициализации FOLLOW-множеств.`
-        );
-        this.errorMessages.set(
-            ErrorCode.BUILDER_INVALID_RULE_INDEX_IN_STATE_NAME,
-            (ctx) => `Внутренняя ошибка: невалидный индекс правила ${ctx.offendingSymbol} извлечен из имени состояния '${ctx.stateName}'.`
-        );
-
-
-        // Общие
-        this.errorMessages.set(
-            ErrorCode.GENERAL_UNEXPECTED_ERROR,
-            (ctx) => `Произошла непредвиденная ошибка: ${ctx.message || 'Нет дополнительной информации.'}`
-        );
+            // Общие
+            [
+                ErrorCode.GENERAL_UNEXPECTED_ERROR,
+                (ctx) => `Произошла непредвиденная ошибка: ${ctx.message || 'Нет дополнительной информации.'}`
+            ]
+        ]);
     }
 
     public report(error: CompilerError): void {
