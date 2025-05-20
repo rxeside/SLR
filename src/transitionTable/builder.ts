@@ -352,16 +352,31 @@ class SLRTableBuilder {
         }
     }
 
+    // В классе SLRTableGenerator
     private _finalizeReduceActions(): void {
         // Create a deep copy to iterate over original keys while modifying the copy
         const tableCopy = JSON.parse(JSON.stringify(this.table));
-        const finalTable: TransitionTable = this.table; // Modify original table
+        const finalTable: TransitionTable = this.table;
 
-        for (const stateName in tableCopy) { // Iterate over keys of the table *before* this loop's modifications
-            const match = stateName.match(/^(.+?)(\d+)(\d+)$/);
+        for (const stateName in tableCopy) {
+            // Проверяем, что имя состояния НЕ является результатом слияния (т.е. не содержит пробелов)
+            // и соответствует формату symbol<ruleIndex><position>
+            if (stateName.includes(' ')) { // Это слитое состояние, его Reduce-действия уже должны быть установлены
+                continue;
+            }
+
+            const match = stateName.match(/^(.+?)(\d+)(\d+)$/); // Non-greedy match for symbol
             if (match) {
                 const ruleIndex = parseInt(match[2], 10);
                 const position = parseInt(match[3], 10);
+
+                // Добавляем проверку на NaN для ruleIndex и position, чтобы избежать дальнейших ошибок
+                if (isNaN(ruleIndex) || isNaN(position)) {
+                    // Это может произойти, если имя состояния не соответствует ожидаемому формату,
+                    // но прошло проверку на отсутствие пробелов. Например, если имя символа содержит цифры в конце.
+                    // console.warn(`Could not parse ruleIndex/position from state name: ${stateName}`);
+                    continue;
+                }
 
                 if (ruleIndex < 0 || ruleIndex >= this.rules.length) {
                     console.warn(`Invalid ruleIndex ${ruleIndex} parsed from state name ${stateName} in final processing loop.`);
@@ -388,10 +403,10 @@ class SLRTableBuilder {
                         } else if (finalTable[stateName][followSymbol].length > 0) {
                             const existingAction = finalTable[stateName][followSymbol][0];
                             if (!existingAction.startsWith('R')) {
-                                console.error(`КОНФЛИКТ Shift/Reduce в состоянии ${stateName} по символу ${followSymbol}: Обнаружен Shift ${existingAction}, попытка добавить Reduce ${reduceAction}. Предпочитаем Shift.`);
+                                // console.error(`КОНФЛИКТ Shift/Reduce в состоянии ${stateName} по символу ${followSymbol}: Обнаружен Shift ${existingAction}, попытка добавить Reduce ${reduceAction}. Предпочитаем Shift.`);
                                 addAction = false;
                             } else if (existingAction.startsWith('R') && existingAction !== reduceAction) {
-                                console.error(`КОНФЛИКТ Reduce/Reduce в состоянии ${stateName} по символу ${followSymbol}: Обнаружен ${existingAction}, попытка добавить ${reduceAction}. Оставляем первый (${existingAction}).`);
+                                // console.error(`КОНФЛИКТ Reduce/Reduce в состоянии ${stateName} по символу ${followSymbol}: Обнаружен ${existingAction}, попытка добавить ${reduceAction}. Оставляем первый (${existingAction}).`);
                                 addAction = false;
                             }
                         }
@@ -401,6 +416,11 @@ class SLRTableBuilder {
                     });
                 }
             }
+            // else {
+            // Если stateName не содержит пробел и не матчится, это может быть стартовый символ типа '<Z>'
+            // или другие специальные имена состояний, которые не являются "завершающими" в смысле symbol<index><pos>.
+            // Для таких состояний Reduce-действия обычно не добавляются на этом этапе.
+            // }
         }
     }
 
