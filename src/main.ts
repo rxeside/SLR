@@ -90,8 +90,6 @@ const main = () => {
 
     const errorReporter = new ErrorReporter();
 
-
-
     try {
         const builder = new SLRTableBuilder(rawGrammar);
 
@@ -107,10 +105,8 @@ const main = () => {
         const input = 'a + b'
         const grammar = parseGrammar(rawGrammar);
 
-
         const lexer = new Lexer()
         const tokens = lexer.tokenize(input)
-
 
         const parser = new SLRTableParser(tokens, transitionTable, grammar);
         parser.parse()
@@ -125,7 +121,7 @@ const main = () => {
             // Совсем неизвестная ошибка
             errorReporter.report(new CompilerError(ErrorCode.GENERAL_UNEXPECTED_ERROR, { message: 'Произошла неизвестная ошибка.' }));
         }
-    } finally { // <--- БЛОК FINALLY
+    } finally {
         if (errorReporter.hasErrors()) {
             console.log("\nКомпиляция завершилась с ошибками.");
             // errorReporter.printCollectedErrors(); // Можно вывести все собранные ошибки в конце

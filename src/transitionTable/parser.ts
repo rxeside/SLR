@@ -256,7 +256,7 @@ class SLRTableParser {
             stackSymbolArr.length < n ||
             !arrayEqual(stackSymbolArr.slice(-n), right)
         ) {
-            throw new CompilerError(ErrorCode.PARSER_STACK_MISMATCH, { ruleText: `${left} -> ${right.join(' ')}` });
+            throw new CompilerError(ErrorCode.PARSER_STACK_MISMATCH, { ruleText: `${rule.left} -> ${right.join(' ')}` });
         }
     }
 

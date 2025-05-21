@@ -101,7 +101,7 @@ export class ErrorReporter {
 
         let location = "";
         if (error.context.lineNumber !== undefined) {
-            location = `[${error.context.lineNumber}${error.context.columnNumber !== undefined ? `:${error.context.columnNumber}` : ''}] `;
+            location = `[${error.context.columnNumber !== undefined ? `${error.context.columnNumber}:` : ''}${error.context.lineNumber}] `
         }
 
         console.error(`Ошибка ${error.code}: ${location}${message}`);
