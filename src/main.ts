@@ -13,9 +13,12 @@ const main = () => {
         '<Block> -> <Decl> ;',
 
         '<Decl> -> let id',
+        '<Decl> -> const id = num',
+        
         '<Stmt> -> <Expr>',
-        '<Stmt> -> if <Expr> { <Expr> }',
-        '<Stmt> -> if <Expr> { <Expr> } else { <Expr> }',
+        '<Stmt> -> if <Expr> { <Block> }',
+        '<Stmt> -> if <Expr> { <Block> } else { <Block> }',
+        '<Stmt> -> while <Expr> { <Block> }',
 
         '<Expr> -> ( <Expr> )',
         '<Expr> -> <BinExpr>',
@@ -24,7 +27,7 @@ const main = () => {
         '<BinExpr> -> <T> - <T> ~BinaryExpr',
         '<BinExpr> -> <T> * <T> ~BinaryExpr',
         '<BinExpr> -> <T> / <T> ~BinaryExpr',
-        
+
         '<T> -> id ~Ident',
         '<T> -> num ~Num',
     ];
@@ -35,9 +38,14 @@ const main = () => {
     try {
         const inputs = [
             `
-                if ( 1 + 2 ) { 1 + 2 } ;
+                const a3 = 4 ;
+                let a ;
+                let b ;
+                if ( 1 + 2 ) {
+                    1 + 2 ;
+                } ;
             `,
-            ' if ( 1 + 2 ) { ( 1 + 2 ) } else { ( 1 + 2 ) } ;'
+            ' if ( 1 + 2 ) { ( 1 + 2 ) ; } else { ( 1 + 2 ) ; } ;'
         ]
 
         inputs.forEach(element => {
