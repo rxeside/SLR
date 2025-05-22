@@ -50,42 +50,48 @@ enum Lexeme {
 }
 
 type Position = {
-    line: number;
-    column: number;
-};
-
-type Token = {
-    type: Lexeme;
-    lexeme: string;
-    position: Position;
+    line: number
+    column: number
 };
 
 // Представление грамматического правила
 type GrammarRule = {
-    left: string;
-    right: string[];
-    ruleIndex: number;
-    semanticAction?: string;
+    left: string
+    right: string[]
+    ruleIndex: number
+    semanticAction?: string
 }
 
 // Представление состояния: символ на позиции с индексом
 type State = {
-    name: string; // Например a11, S12
-    symbol: string;
-    ruleIndex: number;
-    position: number;
+    name: string // Например a11, S12
+    symbol: string
+    ruleIndex: number
+    position: number
 }
 
 // Таблица переходов: строки — состояния, столбцы — символы
 type TransitionTable = {
     [state: string]: {
-        [symbol: string]: string[]; // список состояний
+        [symbol: string]: string[] // список состояний
     };
 }
 
-type FirstSets = Map<string, Set<string>>;
+type FirstSets = Map<string, Set<string>>
 
-type FollowSets = Map<string, Set<string>>;
+type FollowSets = Map<string, Set<string>>
+
+class Token {
+    type: Lexeme
+    lexeme: string
+    position: Position
+
+    constructor(type: Lexeme, lexeme: string, position: Position) {
+        this.type = type
+        this.lexeme = lexeme
+        this.position = position
+    }
+}
 
 export {
     Lexeme,

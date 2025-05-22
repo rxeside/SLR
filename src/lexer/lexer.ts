@@ -81,11 +81,11 @@ class Lexer {
                 result += this.currentChar
                 this.advance()
             }
-            return {
-                type: Lexeme.LINE_COMMENT,
-                lexeme: result,
-                position: {line: startLine, column: startColumn},
-            }
+            return new Token(
+                Lexeme.LINE_COMMENT,
+                result,
+                {line: startLine, column: startColumn},
+            )
         } else if (this.currentChar === '{') {
             result += this.currentChar
             this.advance()
@@ -99,18 +99,18 @@ class Lexer {
                 result += this.currentChar
                 this.advance()
             } else {
-                return {
-                    type: Lexeme.ERROR,
-                    lexeme: result,
-                    position: {line: startLine, column: startColumn},
-                }
+                return new Token(
+                    Lexeme.ERROR,
+                    result,
+                    {line: startLine, column: startColumn},
+                )
             }
 
-            return {
-                type: Lexeme.BLOCK_COMMENT,
-                lexeme: result,
-                position: {line: startLine, column: startColumn},
-            }
+            return new Token(
+                Lexeme.BLOCK_COMMENT,
+                result,
+                {line: startLine, column: startColumn},
+            )
         }
 
         return null
@@ -129,11 +129,11 @@ class Lexer {
         }
 
         if (this.currentChar === '.' && this.peek() === '.') {
-            return {
-                type: Lexeme.INTEGER,
-                lexeme: result,
-                position: {line: startLine, column: startColumn},
-            }
+            return new Token(
+                Lexeme.INTEGER,
+                result,
+                {line: startLine, column: startColumn}
+            )
         }
 
         if (this.currentChar === '.') {
@@ -147,11 +147,11 @@ class Lexer {
                     result += this.currentChar
                     this.advance()
                 }
-                return {
-                    type: Lexeme.ERROR,
-                    lexeme: result,
-                    position: {line: startLine, column: startColumn},
-                }
+                return new Token(
+                    Lexeme.ERROR,
+                    result,
+                    {line: startLine, column: startColumn},
+                )
             }
             isFloat = true
 
@@ -171,11 +171,11 @@ class Lexer {
             }
 
             if (!/\d/.test(this.currentChar || '')) {
-                return {
-                    type: Lexeme.ERROR,
-                    lexeme: result,
-                    position: {line: startLine, column: startColumn},
-                }
+                return new Token(
+                    Lexeme.ERROR,
+                    result,
+                    {line: startLine, column: startColumn},
+                )
             }
 
             while (this.currentChar && /\d/.test(this.currentChar)) {
@@ -191,11 +191,11 @@ class Lexer {
                 result += this.currentChar
                 this.advance()
             }
-            return {
-                type: Lexeme.ERROR,
-                lexeme: result,
-                position: {line: startLine, column: startColumn},
-            }
+            return new Token(
+                Lexeme.ERROR,
+                result,
+                {line: startLine, column: startColumn},
+            )
         }
 
         if (/[a-zA-Z_а-яА-Я]/.test(this.currentChar || '')) {
@@ -203,18 +203,18 @@ class Lexer {
                 result += this.currentChar
                 this.advance()
             }
-            return {
-                type: Lexeme.ERROR,
-                lexeme: result,
-                position: {line: startLine, column: startColumn},
-            }
+            return new Token(
+                Lexeme.ERROR,
+                result,
+               {line: startLine, column: startColumn},
+            )
         }
 
-        return {
-            type: isFloat ? Lexeme.FLOAT : Lexeme.INTEGER,
-            lexeme: result,
-            position: {line: startLine, column: startColumn},
-        }
+        return new Token(
+            isFloat ? Lexeme.FLOAT : Lexeme.INTEGER,
+            result,
+            {line: startLine, column: startColumn},
+        )
     }
 
     private identifierOrInvalid(): Token {
@@ -228,27 +228,27 @@ class Lexer {
         }
 
         if (/[а-яА-Я]/.test(result)) {
-            return {
-                type: Lexeme.ERROR,
-                lexeme: result,
-                position: {line: startLine, column: startColumn},
-            }
+            return new Token(
+                Lexeme.ERROR,
+                result,
+                {line: startLine, column: startColumn},
+            )
         }
 
         const keyword = getKeyword(result)
         if (keyword) {
-            return {
-                type: keyword,
-                lexeme: result,
-                position: {line: startLine, column: startColumn},
-            }
+            return new Token(
+                keyword,
+                result,
+                {line: startLine, column: startColumn},
+            )
         }
 
-        return {
-            type: Lexeme.IDENTIFIER,
-            lexeme: result,
-            position: {line: startLine, column: startColumn},
-        }
+        return new Token(
+            Lexeme.IDENTIFIER,
+            result,
+            {line: startLine, column: startColumn},
+        )
     }
 
     private string(): Token {
@@ -264,18 +264,18 @@ class Lexer {
 
         if (this.currentChar === '"') {
             this.advance()
-            return {
-                type: Lexeme.STRING,
-                lexeme: `${result}`,
-                position: {line: startLine, column: startColumn},
-            }
+            return new Token(
+                Lexeme.STRING,
+                `${result}`,
+                {line: startLine, column: startColumn},
+            )
         }
 
-        return {
-            type: Lexeme.ERROR,
-            lexeme: result,
-            position: {line: startLine, column: startColumn},
-        }
+        return new Token(
+            Lexeme.ERROR,
+            result,
+            {line: startLine, column: startColumn},
+        )
     }
 
     private operatorOrPunctuation(): Token {
@@ -286,38 +286,38 @@ class Lexer {
         if (char === '=' && this.peek() === '=') {
             this.advance()
             this.advance()
-            return {
-                type: Lexeme.DOUBLE_EQ,
-                lexeme: '==',
-                position: {line: startLine, column: startColumn},
-            }
+            return new Token(
+                Lexeme.DOUBLE_EQ,
+                '==',
+                {line: startLine, column: startColumn},
+            )
         }
         if (char === '!' && this.peek() === '=') {
             this.advance()
             this.advance()
-            return {
-                type: Lexeme.NOT_EQ,
-                lexeme: '!=',
-                position: {line: startLine, column: startColumn},
-            }
+            return new Token(
+                Lexeme.NOT_EQ,
+                '!=',
+                {line: startLine, column: startColumn},
+            )
         }
         if (char === '>' && this.peek() === '=') {
             this.advance()
             this.advance()
-            return {
-                type: Lexeme.GREATER_EQ,
-                lexeme: '>=',
-                position: {line: startLine, column: startColumn},
-            }
+            return new Token(
+                Lexeme.GREATER_EQ,
+                '>=',
+                {line: startLine, column: startColumn},
+            )
         }
         if (char === '<' && this.peek() === '=') {
             this.advance()
             this.advance()
-            return {
-                type: Lexeme.LESS_EQ,
-                lexeme: '<=',
-                position: {line: startLine, column: startColumn},
-            }
+            return new Token(
+                Lexeme.LESS_EQ,
+                '<=',
+                {line: startLine, column: startColumn},
+            )
         }
 
         const singleCharOperators: Record<string, Lexeme> = {
@@ -342,19 +342,19 @@ class Lexer {
 
         if (singleCharOperators[char]) {
             this.advance()
-            return {
-                type: singleCharOperators[char],
-                lexeme: char,
-                position: {line: startLine, column: startColumn},
-            }
+            return new Token(
+                singleCharOperators[char],
+                char,
+                {line: startLine, column: startColumn},
+            )
         }
 
         this.advance()
-        return {
-            type: Lexeme.ERROR,
-            lexeme: char,
-            position: {line: startLine, column: startColumn},
-        }
+        return new Token(
+            Lexeme.ERROR,
+            char,
+            {line: startLine, column: startColumn},
+        )
     }
 
     private nextToken(): Token | null {
@@ -380,11 +380,11 @@ class Lexer {
             }
             return this.operatorOrPunctuation()
         }
-        return {
-            type: Lexeme.GRID,
-            lexeme: '#',
-            position: {line: this.line, column: this.column},
-        }
+        return new Token(
+            Lexeme.GRID,
+            '#',
+            {line: this.line, column: this.column},
+        )
     }
 }
 
