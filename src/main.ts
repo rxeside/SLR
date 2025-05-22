@@ -14,17 +14,17 @@ const main = () => {
         '<S> -> c'
     ]
     */
-    // const rawGrammar = [
-    //     '<Z> -> <S> #',
-    //     '<S> -> <S> + <T> ~BinaryExpr', // действие для сложения
-    //     '<S> -> <T>',
-    //     '<T> -> <T> * <F> ~BinaryExpr',  // действие для умножения
-    //     '<T> -> <F>',
-    //     '<F> -> - <F> ~UnaryExpr',     // действие для унарного минуса
-    //     '<F> -> ( <S> )',
-    //     '<F> -> id ~act_id',         // действие для идентификатора
-    //     '<F> -> num ~act_num',       // действие для числа
-    // ];
+    const rawGrammar = [
+        '<Z> -> <S> #',
+        '<S> -> <S> + <T> ~BinaryExpr', // действие для сложения
+        '<S> -> <T>',
+        '<T> -> <T> * <F> ~BinaryExpr',  // действие для умножения
+        '<T> -> <F>',
+        '<F> -> - <F> ~UnaryExpr',     // действие для унарного минуса
+        '<F> -> ( <S> )',
+        '<F> -> id ~act_id',         // действие для идентификатора
+        '<F> -> num ~act_num',       // действие для числа
+    ];
 
     // const rawGrammar = [
     //     '<Z> -> <S> #',
@@ -82,11 +82,11 @@ const main = () => {
     //     '<C> -> id'
     // ]
 
-    const rawGrammar = [
-        '<Z> -> <S> # ~Program',
-        '<S> -> <T> + <T> ~BinaryExpr',
-        '<T> -> id ~Ident'
-    ];
+    // const rawGrammar = [
+    //     '<Z> -> <S> # ~Program',
+    //     '<S> -> <T> + <T> ~BinaryExpr',
+    //     '<T> -> id ~Ident'
+    // ];
 
     const errorReporter = new ErrorReporter();
 
@@ -96,13 +96,13 @@ const main = () => {
         const transitionTable = builder.buildTable();
         console.log(transitionTable)
         //const input = '( a )'
-        // const input = '- ( bombardiro + crocodilo ) * ( 4 + - 6 ) + cucarecu + id'
+        const input = '- ( bombardiro + crocodilo ) * ( 4 + - 6 ) cucarecu + id'
         //const input = '( a )'
         //const input = '( a , b )'
         //const input = 'begin d ; s end'
         //const input = '0 1'
         // const input = 'a b c'
-        const input = 'a + b'
+        //const input = 'a + b'
         const grammar = parseGrammar(rawGrammar);
 
         const lexer = new Lexer()
@@ -114,13 +114,15 @@ const main = () => {
         //console.log(error)
         if (error instanceof CompilerError) {
             errorReporter.report(error);
-        } else if (error instanceof Error) {
-            // Для других неожиданных ошибок
-            errorReporter.report(new CompilerError(ErrorCode.GENERAL_UNEXPECTED_ERROR, { message: error.message }));
-        } else {
-            // Совсем неизвестная ошибка
-            errorReporter.report(new CompilerError(ErrorCode.GENERAL_UNEXPECTED_ERROR, { message: 'Произошла неизвестная ошибка.' }));
         }
+        // else if (error instanceof Error) {
+        //     // Для других неожиданных ошибок
+        //     errorReporter.report(new CompilerError(ErrorCode.GENERAL_UNEXPECTED_ERROR, { message: error.message }));
+        // }
+        // else {
+        //     // Совсем неизвестная ошибка
+        //     errorReporter.report(new CompilerError(ErrorCode.GENERAL_UNEXPECTED_ERROR, { message: 'Произошла неизвестная ошибка.' }));
+        // }
     } finally {
         if (errorReporter.hasErrors()) {
             console.log("\nКомпиляция завершилась с ошибками.");

@@ -186,8 +186,8 @@ class SLRTableParser {
             controlObj.isEnd = true
         }
 
-        const astChildren: ASTChildren = this._pop(reduceInfo)
-        this._addToAST(reduceInfo, astChildren)
+        //const astChildren: ASTChildren = this._pop(reduceInfo)
+        //this._addToAST(reduceInfo, astChildren)
 
         this.inputQueue.unshift(this.currToken)
         this.inputQueue.unshift({grammarSymbol: left, token: {} as Token})
@@ -216,35 +216,35 @@ class SLRTableParser {
         return astChildren
     }
 
-    /** Вставка в AST **/
-    private _addToAST(reduceInfo: ReduceInfo, astChildren: ASTStackItem[]) {
-        const {rule, insertionName} = reduceInfo
-        const {left, right} = rule
-
-        if (insertionName) {
-            const newNode = ASTBuilder.buildNode(insertionName, astChildren, rule);
-            this.astStack.push(newNode)
-        } else if (astChildren.length === 1 && astChildren[0] instanceof ASTNode) {
-            this.astStack.push(astChildren[0]);
-        } else if (astChildren.length > 0) {
-            // Multiple children but no action name. What to do?
-            // This might be an error in grammar design for AST or an intermediate rule not meant to produce a single node.
-            // For now, let's re-push them if they are nodes, or log a warning.
-            // This behavior is highly dependent on the grammar and desired AST.
-            console.warn(`Rule ${left} -> ${right.join(' ')} produced children but has no AST action. Children:`, astChildren);
-            // A common strategy is if only one child is an ASTNode, it's passed up.
-            // If multiple, it's often an error unless the grammar is designed for it.
-            const actualAstNodes = astChildren.filter(c => c instanceof ASTNode);
-            if(actualAstNodes.length === 1) {
-                this.astStack.push(actualAstNodes[0]);
-            } else if (actualAstNodes.length > 1) {
-                console.warn(`Multiple ASTNodes [${actualAstNodes.map(n => n.constructor.name).join(', ')}] resulted from reduction of ${left} -> ${right.join(' ')} without specific action. This might lead to an invalid AST structure.`);
-                // Potentially push the first one, or a list, or error.
-                // For now, pushing the first one to avoid breaking the stack for subsequent operations.
-                this.astStack.push(actualAstNodes[0]); // This is a guess, may need adjustment
-            }
-        }
-    }
+    // /** Вставка в AST **/
+    // private _addToAST(reduceInfo: ReduceInfo, astChildren: ASTStackItem[]) {
+    //     const {rule, insertionName} = reduceInfo
+    //     const {left, right} = rule
+    //
+    //     if (insertionName) {
+    //         const newNode = ASTBuilder.buildNode(insertionName, astChildren, rule);
+    //         this.astStack.push(newNode)
+    //     } else if (astChildren.length === 1 && astChildren[0] instanceof ASTNode) {
+    //         this.astStack.push(astChildren[0]);
+    //     } else if (astChildren.length > 0) {
+    //         // Multiple children but no action name. What to do?
+    //         // This might be an error in grammar design for AST or an intermediate rule not meant to produce a single node.
+    //         // For now, let's re-push them if they are nodes, or log a warning.
+    //         // This behavior is highly dependent on the grammar and desired AST.
+    //         console.warn(`Rule ${left} -> ${right.join(' ')} produced children but has no AST action. Children:`, astChildren);
+    //         // A common strategy is if only one child is an ASTNode, it's passed up.
+    //         // If multiple, it's often an error unless the grammar is designed for it.
+    //         const actualAstNodes = astChildren.filter(c => c instanceof ASTNode);
+    //         if(actualAstNodes.length === 1) {
+    //             this.astStack.push(actualAstNodes[0]);
+    //         } else if (actualAstNodes.length > 1) {
+    //             console.warn(`Multiple ASTNodes [${actualAstNodes.map(n => n.constructor.name).join(', ')}] resulted from reduction of ${left} -> ${right.join(' ')} without specific action. This might lead to an invalid AST structure.`);
+    //             // Potentially push the first one, or a list, or error.
+    //             // For now, pushing the first one to avoid breaking the stack for subsequent operations.
+    //             this.astStack.push(actualAstNodes[0]); // This is a guess, may need adjustment
+    //         }
+    //     }
+    // }
 
     /** Проверяет, можно ли свернуться **/
     private _verifyCanReduce(rule: GrammarRule) {
