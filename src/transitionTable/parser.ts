@@ -2,7 +2,7 @@ import {GrammarRule, Lexeme, Token, TransitionTable} from '@common/types'
 import {Stack} from '@common/stack'
 import {SEPARATOR_SPACE, STATE_REDUCE, STATE_START, SYMBOL_END, SYMBOL_TILDE} from '@common/consts'
 import {arrayEqual} from '@common/utils'
-import {ASTNode, Identifier, Literal} from '@src/ast/entity'
+import {ASTNode} from '@src/ast/entity'
 import {ASTBuilder} from '@src/ast/builder'
 
 type ASTStackItem = ASTNode | Token
@@ -75,7 +75,11 @@ class SLRTableParser {
                     state: currAction.join(SEPARATOR_SPACE)
                 })
                 // console.log(JSON.stringify({stack: this.stack.toArray()}, null, 2))
-                this._addSimpleToAST(this.currToken)
+                const shiftedToken = this.currToken.token
+                if (this._isTokenSignificantForAST(shiftedToken)) {
+                    this.astStack.push(shiftedToken)
+                }
+                // console.log({ast: this.astStack.toArray()})
                 continue
             }
 
@@ -146,29 +150,6 @@ class SLRTableParser {
         return { rule: ruleForReduce, insertionName }
     }
 
-    /** Вставляет в AST примитивные узлы или токены, которые потом используются для больших узлов **/
-    private _addSimpleToAST(shiftedTokenItem: QueueItem): void {
-        const token = shiftedTokenItem.token
-        switch (token.type) {
-            case Lexeme.IDENTIFIER:
-                this.astStack.push(new Identifier(token.lexeme))
-                break
-            case Lexeme.INTEGER:
-                this.astStack.push(new Literal(parseInt(token.lexeme, 10)))
-                break
-            case Lexeme.FLOAT:
-                this.astStack.push(new Literal(parseFloat(token.lexeme)))
-                break
-            default:
-                if (token.type !== Lexeme.EOF && token.lexeme !== SYMBOL_END) {
-                    if (['+', '-', '*', '/', '(', ')', '#'].includes(token.lexeme)) {
-                        this.astStack.push(token)
-                    }
-                }
-                break
-        }
-    }
-
     /** Свёртка по конкретному правилу **/
     private _reduceByGrammarRule(reduceInfo: ReduceInfo, controlObj: ControlObj) {
         const { rule } = reduceInfo
@@ -189,7 +170,6 @@ class SLRTableParser {
     /** Вырезает из стека и AST-стека элементы для свёртки, элементы из AST-стека возвращает **/
     private _pop(reduceInfo: ReduceInfo): ASTChildren {
         const {rule, insertionName} = reduceInfo
-
 
         const astChildren: ASTChildren = []
         for (let k = 0; k < rule.right.length; k++) {
@@ -214,6 +194,7 @@ class SLRTableParser {
         const {rule, insertionName} = reduceInfo
         const {left, right} = rule
 
+        // TODO: понять по грамматике нужны ли условия из else if
         if (insertionName) {
             const newNode = ASTBuilder.buildNode(insertionName, astChildren, rule);
             this.astStack.push(newNode)
@@ -237,6 +218,16 @@ class SLRTableParser {
                 this.astStack.push(actualAstNodes[0]); // This is a guess, may need adjustment
             }
         }
+    }
+
+    private _isTokenSignificantForAST(token: Token): boolean {
+        if (token.type === Lexeme.EOF || token.lexeme === SYMBOL_END || token.type === undefined) {
+            return false;
+        }
+        // Можно добавить фильтрацию ненужных токенов (запятые, точки с запятой, если они НИКОГДА не нужны билдеру)
+        // const purelySyntacticLexemes = [';']; // Пример
+        // if (purelySyntacticLexemes.includes(token.lexeme)) return false;
+        return true;
     }
 
     /** Проверяет, можно ли свернуться **/
@@ -276,5 +267,4 @@ class SLRTableParser {
 
 export {
     SLRTableParser,
-    TOKEN_TYPE_TO_GRAMMAR_SYMBOL_MAP,
 }

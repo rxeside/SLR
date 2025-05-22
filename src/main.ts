@@ -80,9 +80,19 @@ const main = () => {
     // ]
 
     const rawGrammar = [
-        '<Z> -> <S> # ~Program',
-        '<S> -> <T> + <T> ~BinaryExpr',
-        '<T> -> id ~Ident'
+        '<Z> -> <StmtList> # ~Program',
+        '<Z> -> # ~Program',
+        '<StmtList> -> <Stmt> ; <StmtList>',
+        '<StmtList> -> <Stmt> ;',
+        '<Stmt> -> <Expr>',
+        '<Expr> -> ( <Expr> )',
+        '<Expr> -> <BinExpr>',
+        '<BinExpr> -> <T> + <T> ~BinaryExpr',
+        '<BinExpr> -> <T> - <T> ~BinaryExpr',
+        '<BinExpr> -> <T> * <T> ~BinaryExpr',
+        '<BinExpr> -> <T> / <T> ~BinaryExpr',
+        '<T> -> id ~Ident',
+        '<T> -> num ~Num',
     ];
 
     const builder = new SLRTableBuilder(rawGrammar);
@@ -98,7 +108,10 @@ const main = () => {
         //const input = 'begin d ; s end'
         //const input = '0 1'
         // const input = 'a b c'
-        const input = 'a + b'
+        const input = `
+        a + 1 ;
+        (b - d) ;
+        `
         const grammar = parseGrammar(rawGrammar);
 
 
