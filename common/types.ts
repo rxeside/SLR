@@ -13,6 +13,9 @@ enum Lexeme {
     LET = 'LET',
     CONST = 'CONST',
     INT = 'INT',
+    WHILE = 'WHILE',
+    FUNCTION = 'FUNCTION',
+    RETURN = 'RETURN',
     // Операторы и знаки пунктуации
     MULTIPLICATION = '*',
     PLUS = '+',

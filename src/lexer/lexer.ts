@@ -15,6 +15,9 @@ function getKeyword(value: string): Lexeme | undefined {
         Lexeme.LET,
         Lexeme.CONST,
         Lexeme.INT,
+        Lexeme.WHILE,
+        Lexeme.FUNCTION,
+        Lexeme.RETURN,
     ]
 
     return keywords.find(keyword => keyword === value.toUpperCase()) as Lexeme | undefined

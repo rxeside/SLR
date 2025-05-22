@@ -16,9 +16,9 @@ const main = () => {
         '<Decl> -> const id = num',
         
         '<Stmt> -> <Expr>',
-        '<Stmt> -> if <Expr> { <Block> }',
-        '<Stmt> -> if <Expr> { <Block> } else { <Block> }',
-        '<Stmt> -> while <Expr> { <Block> }',
+        '<Stmt> -> if <Expr> { <BlockList> }',
+        '<Stmt> -> if <Expr> { <BlockList> } else { <BlockList> }',
+        '<Stmt> -> while <Expr> { <BlockList> }',
 
         '<Expr> -> ( <Expr> )',
         '<Expr> -> <BinExpr>',
