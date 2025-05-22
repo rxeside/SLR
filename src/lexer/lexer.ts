@@ -7,12 +7,14 @@ function getKeyword(value: string): Lexeme | undefined {
         Lexeme.ELSE,
         Lexeme.OR,
         Lexeme.AND,
-        Lexeme.THEN,
         Lexeme.DIV,
         Lexeme.MOD,
         Lexeme.NOT,
         Lexeme.TRUE,
         Lexeme.FALSE,
+        Lexeme.LET,
+        Lexeme.CONST,
+        Lexeme.INT,
     ]
 
     return keywords.find(keyword => keyword === value.toUpperCase()) as Lexeme | undefined
@@ -71,50 +73,50 @@ class Lexer {
         }
     }
 
-    private skipComment(): Token | null {
-        const startLine = this.line
-        const startColumn = this.column
-        let result = ''
+    // private skipComment(): Token | null {
+    //     const startLine = this.line
+    //     const startColumn = this.column
+    //     let result = ''
 
-        if (this.currentChar === '/' && this.peek() === '/') {
-            while (this.currentChar && this.currentChar !== ('\n' as string)) {
-                result += this.currentChar
-                this.advance()
-            }
-            return {
-                type: Lexeme.LINE_COMMENT,
-                lexeme: result,
-                position: {line: startLine, column: startColumn},
-            }
-        } else if (this.currentChar === '{') {
-            result += this.currentChar
-            this.advance()
+    //     if (this.currentChar === '/' && this.peek() === '/') {
+    //         while (this.currentChar && this.currentChar !== ('\n' as string)) {
+    //             result += this.currentChar
+    //             this.advance()
+    //         }
+    //         return {
+    //             type: Lexeme.LINE_COMMENT,
+    //             lexeme: result,
+    //             position: {line: startLine, column: startColumn},
+    //         }
+    //     } else if (this.currentChar === '{') {
+    //         result += this.currentChar
+    //         this.advance()
 
-            while (this.currentChar && this.currentChar !== ('}' as string)) {
-                result += this.currentChar
-                this.advance()
-            }
+    //         while (this.currentChar && this.currentChar !== ('}' as string)) {
+    //             result += this.currentChar
+    //             this.advance()
+    //         }
 
-            if (this.currentChar === ('}' as string)) {
-                result += this.currentChar
-                this.advance()
-            } else {
-                return {
-                    type: Lexeme.ERROR,
-                    lexeme: result,
-                    position: {line: startLine, column: startColumn},
-                }
-            }
+    //         if (this.currentChar === ('}' as string)) {
+    //             result += this.currentChar
+    //             this.advance()
+    //         } else {
+    //             return {
+    //                 type: Lexeme.ERROR,
+    //                 lexeme: result,
+    //                 position: {line: startLine, column: startColumn},
+    //             }
+    //         }
 
-            return {
-                type: Lexeme.BLOCK_COMMENT,
-                lexeme: result,
-                position: {line: startLine, column: startColumn},
-            }
-        }
+    //         return {
+    //             type: Lexeme.BLOCK_COMMENT,
+    //             lexeme: result,
+    //             position: {line: startLine, column: startColumn},
+    //         }
+    //     }
 
-        return null
-    }
+    //     return null
+    // }
 
     private number(): Token {
         const startColumn = this.column
@@ -363,12 +365,12 @@ class Lexer {
                 this.skipWhitespace()
                 continue
             }
-            if (this.currentChar === '/' && this.peek() === '/') {
-                return this.skipComment()
-            }
-            if (this.currentChar === '{') {
-                return this.skipComment()
-            }
+            // if (this.currentChar === '/' && this.peek() === '/') {
+            //     return this.skipComment()
+            // }
+            // if (this.currentChar === '{') {
+            //     return this.skipComment()
+            // }
             if (this.currentChar === '"') {
                 return this.string()
             }

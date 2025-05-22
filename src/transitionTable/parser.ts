@@ -71,7 +71,7 @@ class SLRTableParser {
                     state: currAction.join(SEPARATOR_SPACE)
                 })
                 // console.log(JSON.stringify({stack: this.stack.toArray()}, null, 2))
-                this._handleInsertion(this.currToken)
+                // this._handleInsertion(this.currToken)
                 continue
             }
 
@@ -98,7 +98,7 @@ class SLRTableParser {
         this.stack = new Stack<StackItem>()
         this.stack.push({symbol: STATE_START, state: STATE_START})
 
-        this.astStack = new Stack<ASTNode | Token>()
+        // this.astStack = new Stack<ASTNode | Token>()
     }
 
     /** Возвращает переход по состоянию и символу, т.е ячейку таблицы на пересечении состояния и символа **/
@@ -188,51 +188,51 @@ class SLRTableParser {
             controlObj.isEnd = true
         }
 
-        const astChildren: (ASTNode | Token)[] = [];
-        if (n > 0) { // Only pop from astStack if RHS is not empty
-            for (let k = 0; k < n; k++) {
-                if (this.astStack.isEmpty()) {
-                    // This can happen if a grammar symbol on RHS didn't push anything to astStack
-                    // (e.g., structural punctuation that isn't part of an AST node's data)
-                    // Or if an epsilon production is involved for one of the RHS symbols.
-                    // This needs careful grammar design.
-                    console.warn(`AST stack empty while expecting child for rule ${rule.ruleIndex}: ${left} -> ${right.join(' ')}. RHS symbol: ${right[n-1-k]}`);
-                    // Decide what to do: push a placeholder, skip, or error
-                    // For now, let's assume valid grammar pushes something or action handles it.
-                } else {
-                    astChildren.push(this.astStack.pop()!);
-                }
-            }
-            astChildren.reverse(); // Children were popped in reverse order of RHS
-        }
+        // const astChildren: (ASTNode | Token)[] = [];
+        // if (n > 0) { // Only pop from astStack if RHS is not empty
+        //     for (let k = 0; k < n; k++) {
+        //         if (this.astStack.isEmpty()) {
+        //             // This can happen if a grammar symbol on RHS didn't push anything to astStack
+        //             // (e.g., structural punctuation that isn't part of an AST node's data)
+        //             // Or if an epsilon production is involved for one of the RHS symbols.
+        //             // This needs careful grammar design.
+        //             console.warn(`AST stack empty while expecting child for rule ${rule.ruleIndex}: ${left} -> ${right.join(' ')}. RHS symbol: ${right[n-1-k]}`);
+        //             // Decide what to do: push a placeholder, skip, or error
+        //             // For now, let's assume valid grammar pushes something or action handles it.
+        //         } else {
+        //             astChildren.push(this.astStack.pop()!);
+        //         }
+        //     }
+        //     astChildren.reverse(); // Children were popped in reverse order of RHS
+        // }
         // console.log(`Reduce by ${left} -> ${right.join(' ')} ~${actionName || ''}. Children from astStack:`, astChildren);
 
-        if (insertionName) {
-            const newNode = ASTBuilder.buildNode(insertionName, astChildren, rule);
-            console.log({newNode})
-            this.astStack.push(newNode);
-        } else if (astChildren.length === 1 && astChildren[0] instanceof ASTNode) {
-            // If no action name, but RHS reduced to a single ASTNode (e.g. E -> T),
-            // propagate that node up.
-            this.astStack.push(astChildren[0]);
-        } else if (astChildren.length > 0) {
-            // Multiple children but no action name. What to do?
-            // This might be an error in grammar design for AST or an intermediate rule not meant to produce a single node.
-            // For now, let's re-push them if they are nodes, or log a warning.
-            // This behavior is highly dependent on the grammar and desired AST.
-            console.warn(`Rule ${left} -> ${right.join(' ')} produced children but has no AST action. Children:`, astChildren);
-            // A common strategy is if only one child is an ASTNode, it's passed up.
-            // If multiple, it's often an error unless the grammar is designed for it.
-            const actualAstNodes = astChildren.filter(c => c instanceof ASTNode);
-            if(actualAstNodes.length === 1) {
-                this.astStack.push(actualAstNodes[0]);
-            } else if (actualAstNodes.length > 1) {
-                console.warn(`Multiple ASTNodes [${actualAstNodes.map(n => n.constructor.name).join(', ')}] resulted from reduction of ${left} -> ${right.join(' ')} without specific action. This might lead to an invalid AST structure.`);
-                // Potentially push the first one, or a list, or error.
-                // For now, pushing the first one to avoid breaking the stack for subsequent operations.
-                this.astStack.push(actualAstNodes[0]); // This is a guess, may need adjustment
-            }
-        }
+        // if (insertionName) {
+        //     // const newNode = ASTBuilder.buildNode(insertionName, astChildren, rule);
+        //     // console.log({newNode})
+        //     // this.astStack.push(newNode);
+        // } else if (astChildren.length === 1 && astChildren[0] instanceof ASTNode) {
+        //     // If no action name, but RHS reduced to a single ASTNode (e.g. E -> T),
+        //     // propagate that node up.
+        //     this.astStack.push(astChildren[0]);
+        // } else if (astChildren.length > 0) {
+        //     // Multiple children but no action name. What to do?
+        //     // This might be an error in grammar design for AST or an intermediate rule not meant to produce a single node.
+        //     // For now, let's re-push them if they are nodes, or log a warning.
+        //     // This behavior is highly dependent on the grammar and desired AST.
+        //     console.warn(`Rule ${left} -> ${right.join(' ')} produced children but has no AST action. Children:`, astChildren);
+        //     // A common strategy is if only one child is an ASTNode, it's passed up.
+        //     // If multiple, it's often an error unless the grammar is designed for it.
+        //     const actualAstNodes = astChildren.filter(c => c instanceof ASTNode);
+        //     if(actualAstNodes.length === 1) {
+        //         this.astStack.push(actualAstNodes[0]);
+        //     } else if (actualAstNodes.length > 1) {
+        //         console.warn(`Multiple ASTNodes [${actualAstNodes.map(n => n.constructor.name).join(', ')}] resulted from reduction of ${left} -> ${right.join(' ')} without specific action. This might lead to an invalid AST structure.`);
+        //         // Potentially push the first one, or a list, or error.
+        //         // For now, pushing the first one to avoid breaking the stack for subsequent operations.
+        //         this.astStack.push(actualAstNodes[0]); // This is a guess, may need adjustment
+        //     }
+        // }
     }
 
     /** Проверяет, успешно ли завершился разбор **/
@@ -248,9 +248,9 @@ class SLRTableParser {
             throw new Error('Таблица неверно составлена: недоделанные символы/состояния')
         }
 
-        if (this.astStack.size() !== 1) {
-            throw new Error(`AST стек имеет ${this.astStack.size()} элементов. Ожидался один элемент (root). AST стек: ${this.astStack.toArray()}`);
-        }
+        // if (this.astStack.size() !== 1) {
+        //     throw new Error(`AST стек имеет ${this.astStack.size()} элементов. Ожидался один элемент (root). AST стек: ${this.astStack.toArray()}`);
+        // }
         console.log("Разбор успешно завершён!")
     }
 }

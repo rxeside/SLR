@@ -10,7 +10,9 @@ enum Lexeme {
     NOT = 'NOT',
     TRUE = 'TRUE',
     FALSE = 'FALSE',
-
+    LET = 'LET',
+    CONST = 'CONST',
+    INT = 'INT',
     // Операторы и знаки пунктуации
     MULTIPLICATION = '*',
     PLUS = '+',

@@ -1,4 +1,4 @@
-import {ASTNode, BinaryExpr, Identifier, Program} from '@src/ast/entity'
+import {ASTNode, BinaryExpr, Identifier, Program, Literal, VarDecl} from '@src/ast/entity'
 import {GrammarRule, Token} from '@common/types'
 
 class ASTBuilder {

@@ -5,10 +5,10 @@
   },
   "devDependencies": {
     "@types/graphviz": "^0.0.39",
-    "@types/node": "^22.7.5",
     "@types/jest": "^29.5.14",
+    "@types/node": "^22.7.5",
     "jest": "^29.7.0",
-    "ts-jest": "^29.2.5",
+    "ts-jest": "^29.3.4",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.1",
     "typescript": "^5.6.3"
