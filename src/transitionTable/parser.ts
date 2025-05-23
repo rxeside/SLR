@@ -77,7 +77,7 @@ class SLRTableParser {
                     state: currAction.join(SEPARATOR_SPACE)
                 })
                 // console.log(JSON.stringify({stack: this.stack.toArray()}, null, 2))
-                this._addSimpleToAST(this.currToken)
+                //this._addSimpleToAST(this.currToken)
                 continue
             }
 
@@ -186,7 +186,7 @@ class SLRTableParser {
             controlObj.isEnd = true
         }
 
-        //const astChildren: ASTChildren = this._pop(reduceInfo)
+        this._pop(reduceInfo)
         //this._addToAST(reduceInfo, astChildren)
 
         this.inputQueue.unshift(this.currToken)
@@ -198,22 +198,22 @@ class SLRTableParser {
         const {rule, insertionName} = reduceInfo
 
 
-        const astChildren: ASTChildren = []
+        //const astChildren: ASTChildren = []
         for (let k = 0; k < rule.right.length; k++) {
             const stackItem = this.stack.pop()
             if (stackItem.symbol === SYMBOL_END) {
                 continue
             }
-            if (this.astStack.isEmpty()) {
-                throw new Error(`AST stack empty while expecting child for rule ${rule.ruleIndex}: ${rule.left} -> ${rule.right.join(' ')}. RHS symbol: ${rule.right[rule.right.length-1-k]}`)
-            } else {
-                astChildren.push(this.astStack.pop()!)
-            }
+            // if (this.astStack.isEmpty()) {
+            //     throw new Error(`AST stack empty while expecting child for rule ${rule.ruleIndex}: ${rule.left} -> ${rule.right.join(' ')}. RHS symbol: ${rule.right[rule.right.length-1-k]}`)
+            // } else {
+            //     astChildren.push(this.astStack.pop()!)
+            // }
         }
-        astChildren.reverse()
-        console.log(`Reduce by ${rule.left} -> ${rule.right.join(' ')} ~${insertionName || ''}. Children from astStack:`, astChildren)
+        //astChildren.reverse()
+        //console.log(`Reduce by ${rule.left} -> ${rule.right.join(' ')} ~${insertionName || ''}. Children from astStack:`, astChildren)
 
-        return astChildren
+        return //astChildren
     }
 
     // /** Вставка в AST **/

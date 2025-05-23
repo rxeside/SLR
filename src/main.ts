@@ -96,7 +96,7 @@ const main = () => {
         const transitionTable = builder.buildTable();
         console.log(transitionTable)
         //const input = '( a )'
-        const input = '- ( bombardiro + crocodilo ) * ( 4 + - 6 ) cucarecu + id'
+        const input = '- ( bombardiro + crocodilo ) * ( 4 + - 6 ) + cucarecu + id'
         //const input = '( a )'
         //const input = '( a , b )'
         //const input = 'begin d ; s end'
