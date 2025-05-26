@@ -24,6 +24,9 @@ function isToken(obj: any): obj is Token {
     return obj && typeof obj === 'object' && 'type' in obj && 'lexeme' in obj && 'position' in obj;
 }
 
+// Константа для позиции по умолчанию
+const DUMMY_POS: Position = { line: 0, column: 0 };
+
 class ASTBuilder {
     private static rootSymbolTable: SymbolTable;
     private static currentSymbolTable: SymbolTable;
@@ -41,6 +44,7 @@ class ASTBuilder {
             true,
             ['int'],
             'void',
+            true,
             true
         );
 
@@ -51,6 +55,7 @@ class ASTBuilder {
             true,
             [],
             'int',
+            true,
             true
         );
     }
@@ -63,6 +68,8 @@ class ASTBuilder {
 
         switch (actionName) {
             case 'Program':
+                // Сбрасываем текущую таблицу символов на глобальную
+                this.currentSymbolTable = this.rootSymbolTable;
                 const programStatements = children.filter(c => c instanceof ASTNode);
                 const program = new Program(programStatements as ASTNode[]);
                 return program;
@@ -70,22 +77,33 @@ class ASTBuilder {
             case 'Block':
                 // Создаем новую область видимости для блока с уникальным именем
                 const blockName = `block_${Math.random().toString(36).substr(2, 9)}`;
-                const prevSymbolTable = this.currentSymbolTable;
-                this.currentSymbolTable = new SymbolTable();
                 this.currentSymbolTable.enterScope(blockName);
                 
-                const blockStatements = children.filter(c => c instanceof ASTNode);
-                const block = new Block(blockStatements as ASTNode[]);
+                // Обрабатываем все дочерние узлы в новой области видимости
+                const blockStatements = children.filter(c => c instanceof ASTNode).map(child => {
+                    if (child instanceof VarDecl) {
+                        // Создаем новую VarDecl с теми же параметрами
+                        const varDecl = this.buildNode('VarDecl', [
+                            { type: Lexeme.IDENTIFIER, lexeme: child.name, position: DUMMY_POS },
+                            { type: Lexeme.IDENTIFIER, lexeme: child.type, position: DUMMY_POS }
+                        ], {} as GrammarRule);
+                        return varDecl;
+                    }
+                    return child;
+                });
+                
+                // Создаем блок
+                const block = new Block(blockStatements);
                 
                 // Возвращаемся в родительскую область видимости
-                this.currentSymbolTable = prevSymbolTable;
+                this.currentSymbolTable.exitScope();
                 return block;
 
             case 'FuncDecl':
                 let funcName: string;
                 let funcParams: Param[] = [];
                 let funcReturnType = 'void';
-                let funcBody: Block;
+                let funcBody: Block | undefined;
 
                 // Получаем имя функции
                 if (children[0] instanceof Identifier) {
@@ -101,10 +119,10 @@ class ASTBuilder {
                     funcName,
                     'function',
                     undefined,
-                    true,
+                    true, // isFunction = true
                     [], // Временно пустой массив параметров
                     funcReturnType,
-                    true
+                    true // isFunctionDefined = true
                 );
 
                 if (!funcEntry) {
@@ -113,15 +131,14 @@ class ASTBuilder {
 
                 // Создаем новую область видимости для функции
                 const functionScope = `function_${funcName}`;
-                const prevFuncSymbolTable = this.currentSymbolTable;
-                this.currentSymbolTable = new SymbolTable();
                 this.currentSymbolTable.enterScope(functionScope);
 
                 // Обрабатываем параметры и тело функции
                 for (let i = 1; i < children.length; i++) {
                     const child = children[i];
                     if (child instanceof Block) {
-                        funcBody = child;
+                        // Обрабатываем блок в текущей области видимости функции
+                        funcBody = this.buildNode('Block', child.statements, {} as GrammarRule) as Block;
                     } else if (isToken(child) && child.type === Lexeme.IDENTIFIER) {
                         funcReturnType = child.lexeme;
                         // Обновляем тип возврата в записи функции
@@ -132,12 +149,12 @@ class ASTBuilder {
                         const param = new Param(child.name, child.type);
                         funcParams.push(param);
                         
-                        // Добавляем параметр строго в область видимости функции
+                        // Добавляем параметр в область видимости функции
                         const paramEntry = this.currentSymbolTable.add(
                             param.name,
                             param.type,
                             undefined,
-                            false
+                            false // isFunction = false для параметров
                         );
 
                         if (!paramEntry) {
@@ -153,13 +170,9 @@ class ASTBuilder {
                 }
 
                 // Возвращаемся в родительскую область видимости
-                this.currentSymbolTable = prevFuncSymbolTable;
+                this.currentSymbolTable.exitScope();
 
-                if (!funcBody) {
-                    throw new Error("FuncDecl: Ожидался блок для тела функции.");
-                }
-
-                return new FuncDecl(funcName, funcParams, funcReturnType, funcBody);
+                return new FuncDecl(funcName, funcParams, funcReturnType, funcBody || new Block([]));
 
             case 'VarDecl':
                 const varName = (children[0] instanceof Identifier) 
@@ -172,12 +185,12 @@ class ASTBuilder {
 
                 const varInitializer = children[2] instanceof ASTNode ? children[2] : undefined;
 
-                // Добавляем переменную строго в текущую область видимости
+                // Добавляем переменную в текущую область видимости
                 const varEntry = this.currentSymbolTable.add(
                     varName,
                     varType,
                     varInitializer instanceof Literal ? (varInitializer as Literal).value : undefined,
-                    false
+                    false // isFunction = false для переменных
                 );
 
                 if (!varEntry) {
@@ -212,7 +225,7 @@ class ASTBuilder {
                     : (isToken(children[0]) ? children[0].lexeme : '');
 
                 // Проверяем существование переменной в текущей области видимости
-                const assignSymbol = this.currentSymbolTable.lookup(assignName);
+                const assignSymbol = this.rootSymbolTable.lookup(assignName);
                 if (!assignSymbol) {
                     throw new Error(`Переменная ${assignName} не объявлена`);
                 }
@@ -275,7 +288,7 @@ class ASTBuilder {
     }
 
     static getCurrentSymbolTable(): SymbolTable {
-        return this.currentSymbolTable;
+        return this.rootSymbolTable;
     }
 
     static getRootSymbolTable(): SymbolTable {

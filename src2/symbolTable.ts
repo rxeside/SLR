@@ -10,6 +10,7 @@ export interface SymbolEntry {
     returnType?: string;        
     isFunctionDefined?: boolean;
     argCount?: number;         
+    isSystem?: boolean;        // Флаг для системных функций
 }
 
 interface Scope {
@@ -62,12 +63,15 @@ export class SymbolTable {
         isFunction: boolean = false, 
         paramTypes?: string[], 
         returnType?: string, 
-        isFunctionDefined: boolean = false
+        isFunctionDefined: boolean = false,
+        isSystem: boolean = false
     ): SymbolEntry | null {
-        // Определяем целевую область видимости
+        // Определяем целевую область видимости:
+        // - Функции всегда добавляются в глобальную область
+        // - Параметры и переменные добавляются в текущую область
         const targetScope = isFunction ? this.globalScope : this.currentScope;
 
-        // Проверяем существование символа ТОЛЬКО в целевой области видимости
+        // Проверяем существование символа ТОЛЬКО в текущей области видимости
         const existingEntry = targetScope.symbols.get(name);
 
         if (existingEntry) {
@@ -98,10 +102,11 @@ export class SymbolTable {
             paramTypes: isFunction ? (paramTypes || []) : undefined,
             returnType: isFunction ? (returnType || 'void') : undefined,
             isFunctionDefined: isFunction ? (isFunctionDefined || false) : undefined,
-            argCount: isFunction && paramTypes ? paramTypes.length : undefined
+            argCount: isFunction && paramTypes ? paramTypes.length : undefined,
+            isSystem: isSystem
         };
 
-        // Добавляем символ ТОЛЬКО в целевую область видимости
+        // Добавляем символ в целевую область видимости
         targetScope.symbols.set(name, entry);
         return entry;
     }
@@ -113,21 +118,14 @@ export class SymbolTable {
 
     lookup(name: string): SymbolEntry | undefined {
         // Сначала ищем в текущей области видимости
-        const entry = this.currentScope.symbols.get(name);
-        if (entry) {
-            return entry;
-        }
-
-        // Если не нашли и есть родительская область, ищем рекурсивно вверх по цепочке
-        let scope = this.currentScope.parent;
+        let scope: Scope | null = this.currentScope;
         while (scope) {
-            const parentEntry = scope.symbols.get(name);
-            if (parentEntry) {
-                return parentEntry;
+            const entry = scope.symbols.get(name);
+            if (entry) {
+                return entry;
             }
             scope = scope.parent;
         }
-
         return undefined;
     }
 

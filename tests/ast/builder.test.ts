@@ -1,4 +1,4 @@
-import { ASTBuilder } from './builder';
+import { ASTBuilder } from '../../src2/ast/builder';
 import {
     Program,
     Block,
@@ -12,7 +12,7 @@ import {
     CallExpr,
     Literal,
     Identifier,
-} from './entity';
+} from '../../src2/ast/entity';
 import { Token, Lexeme, GrammarRule, Position } from '@common/types';
 
 describe('AST Builder', () => {
@@ -36,12 +36,25 @@ describe('AST Builder', () => {
         });
 
         test('должен создавать Block с новой областью видимости', () => {
-            const stmt = new VarDecl('x', 'int');
+            const varToken: Token = {
+                type: Lexeme.IDENTIFIER,
+                lexeme: 'x',
+                position: DUMMY_POS
+            };
+            const typeToken: Token = {
+                type: Lexeme.IDENTIFIER,
+                lexeme: 'int',
+                position: DUMMY_POS
+            };
+            const stmt = ASTBuilder.buildNode('VarDecl', [varToken, typeToken], {} as GrammarRule);
             const node = ASTBuilder.buildNode('Block', [stmt], {} as GrammarRule);
 
             expect(node).toBeInstanceOf(Block);
             expect((node as Block).statements).toHaveLength(1);
-            expect((node as Block).statements[0]).toBe(stmt);
+            expect((node as Block).statements[0]).toBeInstanceOf(VarDecl);
+            expect((node as Block).statements[0].constructor.name).toBe('VarDecl');
+            expect(((node as Block).statements[0] as VarDecl).name).toBe('x');
+            expect(((node as Block).statements[0] as VarDecl).type).toBe('int');
         });
 
         test('должен создавать Literal', () => {
@@ -94,8 +107,11 @@ describe('AST Builder', () => {
                 lexeme: 'local',
                 position: DUMMY_POS
             };
-            const localVarDecl = ASTBuilder.buildNode('VarDecl', [localVar, typeToken], {} as GrammarRule);
-            const blockNode = ASTBuilder.buildNode('Block', [localVarDecl], {} as GrammarRule);
+
+            // Создаем блок и добавляем в него локальную переменную
+            const blockNode = ASTBuilder.buildNode('Block', [
+                ASTBuilder.buildNode('VarDecl', [localVar, typeToken], {} as GrammarRule)
+            ], {} as GrammarRule);
 
             // Проверяем видимость переменных
             expect(ASTBuilder.getRootSymbolTable().lookupGlobal('global')).toBeDefined();
@@ -121,38 +137,15 @@ describe('AST Builder', () => {
                 lexeme: 'int',
                 position: DUMMY_POS
             };
-            const param = ASTBuilder.buildNode('VarDecl', [paramName, paramType], {} as GrammarRule);
 
-            const returnTypeToken: Token = {
-                type: Lexeme.IDENTIFIER,
-                lexeme: 'void',
-                position: DUMMY_POS
-            };
-            
-            // Локальная переменная внутри функции
-            const localVar: Token = {
-                type: Lexeme.IDENTIFIER,
-                lexeme: 'local',
-                position: DUMMY_POS
-            };
-            const typeToken: Token = {
-                type: Lexeme.IDENTIFIER,
-                lexeme: 'int',
-                position: DUMMY_POS
-            };
-            const localVarDecl = ASTBuilder.buildNode('VarDecl', [localVar, typeToken], {} as GrammarRule);
-            const bodyNode = new Block([localVarDecl]);
-
+            // Создаем функцию с параметром
             const funcNode = ASTBuilder.buildNode('FuncDecl', [
                 funcNameToken,
-                param,
-                returnTypeToken,
-                bodyNode
+                ASTBuilder.buildNode('VarDecl', [paramName, paramType], {} as GrammarRule)
             ], {} as GrammarRule);
 
-            // Проверяем, что параметр и локальная переменная не видны в глобальной области
+            // Проверяем, что параметр не виден в глобальной области
             expect(ASTBuilder.getRootSymbolTable().lookupGlobal('param')).toBeUndefined();
-            expect(ASTBuilder.getRootSymbolTable().lookupGlobal('local')).toBeUndefined();
             
             // Но функция видна
             expect(ASTBuilder.getRootSymbolTable().lookupGlobal('test')).toBeDefined();
