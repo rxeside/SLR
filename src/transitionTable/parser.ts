@@ -4,6 +4,11 @@ import {SEPARATOR_SPACE, STATE_REDUCE, STATE_START, SYMBOL_END, SYMBOL_TILDE} fr
 import {arrayEqual} from '@common/utils'
 import {ASTNode, Identifier, Literal} from '@src/ast/entity'
 import {ASTBuilder} from '@src/ast/builder'
+import {SymbolTable} from '@src/symbolTable'
+
+type ASTStackItem = ASTNode | Token
+
+type ASTChildren = ASTStackItem[]
 
 type StackItem = {
     symbol: string,
@@ -42,6 +47,9 @@ class SLRTableParser {
     private inputQueue: QueueItem[]
     private currToken: QueueItem
     private currState: string
+    
+    /** Таблицы символов **/
+    private symbolTable: SymbolTable
 
     /**
      * Сдвиг-сверточный парсер по SLR(1)-таблице
@@ -53,6 +61,9 @@ class SLRTableParser {
         this.tokens = tokens
         this.table = table
         this.grammar = grammar
+        
+        // Инициализируем таблицы символов
+        this.symbolTable = new SymbolTable()
     }
 
     parse(): void {
@@ -166,8 +177,155 @@ class SLRTableParser {
 
     /** Свёртка по конкретному правилу **/
     private _reduceByGrammarRule(reduceInfo: ReduceInfo, controlObj: ControlObj) {
-        const { rule, insertionName } = reduceInfo
-        const { left, right } = rule
+        const { rule } = reduceInfo
+        const { left } = rule
+
+        this._verifyCanReduce(rule)
+        if (left === STATE_START) {
+            controlObj.isEnd = true
+        }
+
+        const astChildren: ASTChildren = this._pop(reduceInfo)
+        this._addToAST(reduceInfo, astChildren)
+
+        this.inputQueue.unshift(this.currToken)
+        this.inputQueue.unshift({grammarSymbol: left, token: {} as Token})
+    }
+
+    /** Вырезает из стека и AST-стека элементы для свёртки, элементы из AST-стека возвращает **/
+    private _pop(reduceInfo: ReduceInfo): ASTChildren {
+        const {rule, insertionName} = reduceInfo
+
+        const astChildren: ASTChildren = []
+        for (let k = 0; k < rule.right.length; k++) {
+            const stackItem = this.stack.pop()
+            if (stackItem.symbol === SYMBOL_END) {
+                continue
+            }
+            if (this.astStack.isEmpty()) {
+                throw new Error(`AST stack empty while expecting child for rule ${rule.ruleIndex}: ${rule.left} -> ${rule.right.join(' ')}. RHS symbol: ${rule.right[rule.right.length-1-k]}`)
+            } else {
+                astChildren.push(this.astStack.pop()!)
+            }
+        }
+        astChildren.reverse()
+        console.log(`Reduce by ${rule.left} -> ${rule.right.join(' ')} ~${insertionName || ''}. Children from astStack:`, astChildren)
+
+        return astChildren
+    }
+
+    /** Вставка в AST **/
+    private _addToAST(reduceInfo: ReduceInfo, astChildren: ASTStackItem[]) {
+        const {rule, insertionName} = reduceInfo
+        const {left, right} = rule
+
+        if (insertionName) {
+            const newNode = ASTBuilder.buildNode(insertionName, astChildren, rule);
+            
+            // Обработка идентификаторов и функций для таблиц символов
+            this._processSymbolsForAST(insertionName, astChildren, newNode);
+            
+            this.astStack.push(newNode)
+        } else if (astChildren.length === 1 && astChildren[0] instanceof ASTNode) {
+            this.astStack.push(astChildren[0]);
+        } else if (astChildren.length > 0) {
+            console.warn(`Rule ${left} -> ${right.join(' ')} produced children but has no AST action. Children:`, astChildren);
+            const actualAstNodes = astChildren.filter(c => c instanceof ASTNode);
+            if(actualAstNodes.length === 1) {
+                this.astStack.push(actualAstNodes[0]);
+            } else if (actualAstNodes.length > 1) {
+                console.warn(`Multiple ASTNodes [${actualAstNodes.map(n => n.constructor.name).join(', ')}] resulted from reduction of ${left} -> ${right.join(' ')} without specific action. This might lead to an invalid AST structure.`);
+                this.astStack.push(actualAstNodes[0]);
+            }
+        }
+    }
+
+    /**
+     * Обработка символов для добавления в таблицы символов
+     */
+    private _processSymbolsForAST(actionName: string, children: ASTChildren, node: ASTNode): void {
+        switch(actionName) {
+            case 'Ident':
+                if (children.length === 1 && 'lexeme' in children[0]) {
+                    const identName = children[0].lexeme;
+                    // Add as a general identifier if not already declared in the current scope
+                    // If it's a function call, it should already be declared.
+                    // If it's a variable declaration, this is the place to add it.
+                    if (!this.symbolTable.lookupCurrentScope(identName)) {
+                         // Assuming it's a variable for now. 
+                         // Function declarations will be handled by specific grammar rules and actions like 'FunctionDecl'.
+                        this.symbolTable.add(identName, 'identifier');
+                        console.log(`Added identifier to symbol table: ${identName}`);
+                    } else {
+                        console.log(`Identifier ${identName} already in symbol table or is a function.`);
+                    }
+                }
+                break;
+                
+            case 'Num':
+                if (children.length === 1 && 'lexeme' in children[0]) {
+                    const numValue = children[0].lexeme;
+                    // Adding number literal. In a real compiler, this might not be needed
+                    // or handled differently (e.g., direct value in AST, not in symbol table)
+                    this.symbolTable.add(`lit_${numValue}`, 'number_literal', parseFloat(numValue));
+                }
+                break;
+            
+            // Example cases for function declaration and definition
+            // These actionNames ('FunctionDecl', 'FunctionDef') must match your grammar rules actions
+            case 'FunctionDecl': // Example: <FuncDecl> -> type id ( <ParamsOpt> ) ~FunctionDecl
+                // Assuming children are [returnTypeToken, idToken, paramsNode_or_Tokens]
+                // This is a simplified example. You'll need to extract actual types and names from tokens/nodes.
+                if (children.length >= 2 && 'lexeme' in children[1]) { // Expecting at least idToken
+                    const funcName = children[1].lexeme;
+                    const returnType = children[0] && 'lexeme' in children[0] ? children[0].lexeme : 'void'; // Simplified
+                    // paramTypes would need to be extracted from children[2] (params part of the rule)
+                    const paramTypes: string[] = []; // Placeholder - extract from actual AST node for params
+                    this.symbolTable.add(funcName, 'function', undefined, true, paramTypes, returnType, false);
+                    console.log(`Declared function: ${funcName}`);
+                }
+                break;
+
+            case 'FunctionDef': // Example: <FuncDef> -> <FuncDecl> <Block> ~FunctionDef
+                // Assuming children are [funcDeclNode, blockNode]
+                // funcDeclNode would contain the name and signature.
+                if (children.length > 0 && children[0] instanceof ASTNode && children[0].type === 'FunctionDecl') {
+                    // This is highly dependent on your AST structure for FunctionDecl
+                    const funcDeclNode = children[0]; // This node would have the function name, params, return type
+                    // Let's assume funcDeclNode.name or similar holds the function name
+                    const funcName = (funcDeclNode as any).name; // Adjust based on your ASTNode structure for FunctionDecl
+                    if(funcName && typeof funcName === 'string'){
+                        const existingEntry = this.symbolTable.lookup(funcName);
+                        if (existingEntry && existingEntry.isFunction) {
+                            this.symbolTable.add(funcName, 'function', undefined, true, existingEntry.paramTypes, existingEntry.returnType, true);
+                            console.log(`Defined function: ${funcName}`);
+                        }
+                    } else {
+                        console.error("Could not define function: name not found in FunctionDecl node.")
+                    }
+                }
+                break;
+
+            case 'Program':
+                console.log("\n=== Parsed Program ===");
+                this.symbolTable.print();
+                break;
+        }
+    }
+
+    private _isTokenSignificantForAST(token: Token): boolean {
+        if (token.type === Lexeme.EOF || token.lexeme === SYMBOL_END || token.type === undefined) {
+            return false;
+        }
+        // Можно добавить фильтрацию ненужных токенов (запятые, точки с запятой, если они НИКОГДА не нужны билдеру)
+        // const purelySyntacticLexemes = [';']; // Пример
+        // if (purelySyntacticLexemes.includes(token.lexeme)) return false;
+        return true;
+    }
+
+    /** Проверяет, можно ли свернуться **/
+    private _verifyCanReduce(rule: GrammarRule) {
+        const { right } = rule
         const stackSymbolArr: string[] = this.stack.toArray().map(item => item.symbol)
         const n = right.length
 
@@ -252,6 +410,13 @@ class SLRTableParser {
         //     throw new Error(`AST стек имеет ${this.astStack.size()} элементов. Ожидался один элемент (root). AST стек: ${this.astStack.toArray()}`);
         // }
         console.log("Разбор успешно завершён!")
+    }
+    
+    /**
+     * Возвращает таблицу символов
+     */
+    getSymbolTable(): SymbolTable {
+        return this.symbolTable;
     }
 }
 
