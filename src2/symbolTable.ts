@@ -187,7 +187,6 @@ export class SymbolTable {
             });
         }
 
-        // Recursively print child scopes
         for (const child of scope.children) {
             this.printScope(child, depth + 1);
         }
