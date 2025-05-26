@@ -1,6 +1,6 @@
 import { SLRTableBuilder } from '@src/transitionTable/builder'
 import { SLRTableParser } from '@src/transitionTable/parser'
-import { Lexer } from '@src/lexer/lexer'
+import { Lexer } from 'src2/lexer';
 
 const main = () => {
     const potGrammar = [
@@ -14,6 +14,10 @@ const main = () => {
 
         '<Decl> -> let id',
         '<Decl> -> const id = num',
+        // '<Decl> -> function id',
+
+        // '<ParamList> -> id , <ParamList>',
+        // '<ParamList> -> id',
         
         '<Stmt> -> <Expr>',
         '<Stmt> -> if <Expr> { <BlockList> }',
@@ -38,14 +42,20 @@ const main = () => {
     try {
         const inputs = [
             `
-                const a3 = 4 ;
                 let a ;
                 let b ;
                 if ( 1 + 2 ) {
                     1 + 2 ;
+                    let a ;
+                    let b ;
                 } ;
             `,
-            ' if ( 1 + 2 ) { ( 1 + 2 ) ; } else { ( 1 + 2 ) ; } ;'
+            ' if ( 1 + 2 ) { ( 1 + 2 ) ; } else { ( 1 + 2 ) ; } ;',
+            // `
+            //     func foo ( x, y ) {
+            //         x + y ;
+            //     }
+            // `
         ]
 
         inputs.forEach(element => {

@@ -1,0 +1,69 @@
+export const EOF_SYMBOL = '$'; // Символ конца файла
+export const EPSILON = 'ε'; // Символ для эпсилон (можно использовать пустую строку в грамматике)
+
+export const TT = { // Token Types
+    KEYWORD_LET: 'let',
+    KEYWORD_CONST: 'const',
+    KEYWORD_FUNCTION: 'function',
+    KEYWORD_IF: 'if',
+    KEYWORD_ELSE: 'else',
+    KEYWORD_WHILE: 'while',
+    KEYWORD_RETURN: 'return',
+
+    IDENTIFIER: 'id',
+    NUMBER: 'num',
+
+    OPERATOR_PLUS: '+',
+    OPERATOR_MINUS: '-',
+    OPERATOR_MULTIPLY: '*',
+    OPERATOR_DIVIDE: '/',
+    OPERATOR_ASSIGN: '=',
+
+    PUNCT_SEMICOLON: ';',
+    PUNCT_COMMA: ',',
+    PUNCT_LPAREN: '(',
+    PUNCT_RPAREN: ')',
+    PUNCT_LBRACE: '{',
+    PUNCT_RBRACE: '}',
+
+    EOF: EOF_SYMBOL, // Используем общий EOF_SYMBOL
+    UNKNOWN: 'UNKNOWN', // Для непредвиденных символов
+    NULL: null, // для комментов
+};
+
+export const tokenSpecifications: [RegExp, string | null][] = [
+    // Пробельные символы и комментарии (игнорируются, тип null)
+    [/^\s+/, null], // Пробелы, табы, новые строки
+    [/^\/\/.*/, null], // Однострочные комментарии
+
+    // Ключевые слова
+    [/^let\b/, TT.KEYWORD_LET],
+    [/^const\b/, TT.KEYWORD_CONST],
+    [/^function\b/, TT.KEYWORD_FUNCTION],
+    [/^if\b/, TT.KEYWORD_IF],
+    [/^else\b/, TT.KEYWORD_ELSE],
+    [/^while\b/, TT.KEYWORD_WHILE],
+    [/^return\b/, TT.KEYWORD_RETURN],
+
+    // Пунктуация
+    [/^;/, TT.PUNCT_SEMICOLON],
+    [/^,/, TT.PUNCT_COMMA],
+    [/^\(/, TT.PUNCT_LPAREN],
+    [/^\)/, TT.PUNCT_RPAREN],
+    [/^\{/, TT.PUNCT_LBRACE],
+    [/^\}/, TT.PUNCT_RBRACE],
+
+    // Операторы
+    [/^\+/, TT.OPERATOR_PLUS],
+    [/^\-/, TT.OPERATOR_MINUS],
+    [/^\*/, TT.OPERATOR_MULTIPLY],
+    [/^\//, TT.OPERATOR_DIVIDE],
+    [/^=/, TT.OPERATOR_ASSIGN],
+
+    // Числа (простые целые)
+    [/^[0-9]+/, TT.NUMBER],
+
+    // Идентификаторы (должны идти после ключевых слов)
+    // Начинаются с буквы или _, затем буквы, цифры или _
+    [/^[a-zA-Z_][a-zA-Z0-9_]*/, TT.IDENTIFIER],
+];
