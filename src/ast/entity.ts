@@ -1,6 +1,5 @@
-import {ASTVisitor} from '@src/ast/visitor'
+import {ASTVisitor} from '@src/ast/visitor'; // Убедитесь, что путь правильный
 
-// Базовый узел AST
 abstract class ASTNode {
     abstract accept(visitor: ASTVisitor): any;
 }
@@ -16,7 +15,7 @@ class Program extends ASTNode {
 }
 
 class Block extends ASTNode {
-    constructor(public statements: ASTNode[]) {
+    constructor(public statements: ASTNode[]) { // Может быть пустым для правила <Block> -> { }
         super();
     }
 
@@ -25,8 +24,22 @@ class Block extends ASTNode {
     }
 }
 
+class Identifier extends ASTNode { // Identifier должен быть определен до его использования
+    constructor(public name: string) {
+        super();
+    }
+
+    accept(visitor: ASTVisitor) {
+        return visitor.visitIdentifier(this);
+    }
+}
+
 class VarDecl extends ASTNode {
-    constructor(public name: string, public type: string, public initializer?: ASTNode) {
+    constructor(
+        public name: Identifier,       // Имя переменной теперь Identifier узел
+        public type: ASTNode,          // Тип теперь ASTNode (например, Literal или другой узел типа)
+        public initializer?: ASTNode
+    ) {
         super();
     }
 
@@ -36,7 +49,11 @@ class VarDecl extends ASTNode {
 }
 
 class ConstDecl extends ASTNode {
-    constructor(public name: string, public type: string, public value: ASTNode) {
+    constructor(
+        public name: Identifier,       // Имя константы теперь Identifier узел
+        public type: ASTNode,          // Тип теперь ASTNode
+        public value: ASTNode
+    ) {
         super();
     }
 
@@ -45,12 +62,40 @@ class ConstDecl extends ASTNode {
     }
 }
 
+// --- Новые и обновленные узлы для функций ---
+
+// ParamNode теперь наследуется от ASTNode
+class ParamNode extends ASTNode {
+    constructor(
+        public name: Identifier, // Имя параметра как Identifier узел
+        public type: ASTNode     // Тип параметра как ASTNode
+    ) {
+        super();
+    }
+
+    accept(visitor: ASTVisitor) {
+        // Предполагаем, что в ASTVisitor будет метод visitParamNode
+        return visitor.visitParamNode(this);
+    }
+}
+
+class ParamList extends ASTNode {
+    constructor(public params: ParamNode[]) { // Массив узлов ParamNode
+        super();
+    }
+
+    accept(visitor: ASTVisitor) {
+        // Предполагаем, что в ASTVisitor будет метод visitParamList
+        return visitor.visitParamList(this);
+    }
+}
+
 class FuncDecl extends ASTNode {
     constructor(
-        public name: string,
-        public params: Param[],
-        public returnType: string,
-        public body: Block
+        public name: Identifier,       // Имя функции как Identifier узел
+        public params: ParamList,      // Список параметров как узел ParamList
+        public returnType: ASTNode,    // Тип возвращаемого значения как ASTNode
+        public body: Block             // Тело функции
     ) {
         super();
     }
@@ -60,17 +105,16 @@ class FuncDecl extends ASTNode {
     }
 }
 
-class Param {
-    constructor(public name: string, public type: string) {}
-}
+// --- Остальные существующие узлы (без изменений в структуре, если они не использовали имя/тип как строку) ---
 
 class AssignExpr extends ASTNode {
-    constructor(public name: string, public value: ASTNode) {
+    // Если name в AssignExpr должен быть Identifier узлом, а не строкой:
+    constructor(public target: Identifier, public value: ASTNode) { // Изменено name на target: Identifier
         super();
     }
 
     accept(visitor: ASTVisitor) {
-        return visitor.visitAssign(this);
+        return visitor.visitAssignExpr(this); // Возможно, visitAssign переименуется в visitAssignExpr
     }
 }
 
@@ -95,7 +139,8 @@ class UnaryExpr extends ASTNode {
 }
 
 class CallExpr extends ASTNode {
-    constructor(public callee: string, public args: ASTNode[]) {
+    // Если callee должен быть Identifier узлом (для возможности разрешения имен и т.д.):
+    constructor(public callee: Identifier, public args: ASTNode[]) { // Изменено callee: string на callee: Identifier
         super();
     }
 
@@ -114,15 +159,6 @@ class Literal extends ASTNode {
     }
 }
 
-class Identifier extends ASTNode {
-    constructor(public name: string) {
-        super();
-    }
-
-    accept(visitor: ASTVisitor) {
-        return visitor.visitIdentifier(this);
-    }
-}
 
 class IfStmt extends ASTNode {
     constructor(
@@ -164,21 +200,33 @@ class ForStmt extends ASTNode {
     }
 }
 
+// Класс Param удален, так как его заменил ParamNode
+// Если он все еще где-то нужен как простой объект, его можно оставить,
+// но для AST используется ParamNode.
+
 export {
     ASTNode,
     Program,
     Block,
+    Identifier, // Экспортируем Identifier
     VarDecl,
     ConstDecl,
+    ParamNode,  // Экспортируем ParamNode
+    ParamList,  // Экспортируем ParamList
     FuncDecl,
-    Param,
     AssignExpr,
     BinaryExpr,
     UnaryExpr,
     CallExpr,
     Literal,
-    Identifier,
     IfStmt,
     WhileStmt,
     ForStmt,
-}
+    // Param, // Удаляем из экспорта, если не используется независимо
+};
+
+// Не забудьте обновить интерфейс ASTVisitor, добавив:
+// visitIdentifier(node: Identifier): any;
+// visitParamNode(node: ParamNode): any;
+// visitParamList(node: ParamList): any;
+// И, возможно, переименовать visitAssign в visitAssignExpr, если вы изменили AssignExpr.

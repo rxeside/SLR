@@ -13,6 +13,13 @@ function getKeyword(value: string): Lexeme | undefined {
         Lexeme.NOT,
         Lexeme.TRUE,
         Lexeme.FALSE,
+        Lexeme.VAR,
+        Lexeme.FUNC,
+        Lexeme.CONST,
+        Lexeme.STRING_TYPE,
+        Lexeme.NUMBER_TYPE,
+        Lexeme.BOOLEAN_TYPE,
+        Lexeme.NULL_TYPE,
     ]
 
     return keywords.find(keyword => keyword === value.toUpperCase()) as Lexeme | undefined
@@ -265,7 +272,7 @@ class Lexer {
         if (this.currentChar === '"') {
             this.advance()
             return new Token(
-                Lexeme.STRING,
+                Lexeme.STRING_L,
                 `${result}`,
                 {line: startLine, column: startColumn},
             )

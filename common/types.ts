@@ -10,6 +10,13 @@ enum Lexeme {
     NOT = 'NOT',
     TRUE = 'TRUE',
     FALSE = 'FALSE',
+    CONST = 'CONST',
+    FUNC = 'FUNC',
+    VAR = 'VAR',
+    STRING_TYPE = 'STRING',
+    NUMBER_TYPE = 'NUMBER',
+    BOOLEAN_TYPE = 'BOOLEAN',
+    NULL_TYPE = 'NULL',
 
     // Операторы и знаки пунктуации
     MULTIPLICATION = '*',
@@ -36,7 +43,7 @@ enum Lexeme {
 
     // Литералы и идентификаторы
     IDENTIFIER = 'IDENTIFIER',
-    STRING = 'STRING',
+    STRING_L = 'STRING_L',
     INTEGER = 'INTEGER',
     FLOAT = 'FLOAT',
 
@@ -46,7 +53,7 @@ enum Lexeme {
 
     // Специальные
     ERROR = 'ERROR',
-    EOF = 'EOF'
+    EOF = 'EOF',
 }
 
 type Position = {

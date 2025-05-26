@@ -5,7 +5,7 @@ import {
     ConstDecl,
     ForStmt,
     FuncDecl, Identifier,
-    IfStmt, Literal,
+    IfStmt, Literal, ParamList, ParamNode,
     Program, UnaryExpr,
     VarDecl,
     WhileStmt,
@@ -27,7 +27,9 @@ type ASTVisitor = {
     visitLiteral(node: Literal): any;
     visitIdentifier(node: Identifier): any;
     visitCallExpr(node: CallExpr): any;
-    // ... добавить остальные по мере необходимости
+    visitAssignExpr(param: AssignExpr): any
+    visitParamList(param: ParamList): any
+    visitParamNode(param: ParamNode): any
 }
 
 export {

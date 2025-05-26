@@ -84,6 +84,20 @@ const main = () => {
         '<Z> -> # ~Program',
         '<StmtList> -> <Stmt> ; <StmtList>',
         '<StmtList> -> <Stmt> ;',
+        '<Stmt> -> <VarDecl>',
+        '<VarDecl> -> var <Ident> : <Type> = <Expr> ~VarDecl',
+        '<VarDecl> -> var <Ident> : <Type> ~VarDeclNoInit',
+        '<Type> -> number ~TypeNumber',
+        '<Type> -> boolean ~TypeBoolean',
+        '<Type> -> string ~TypeString',
+        '<Type> -> null ~TypeNull',
+        '<Stmt> -> <FuncDecl>',
+        '<FuncDecl> -> func <Ident> ( <ParamList> ) : <Type> <Block> ~Func',
+        '<FuncDecl> -> func <Ident> ( ) : <Type> <Block> ~Func',
+        '<ParamList> -> <Param> , <ParamList> ~ParamList',
+        '<ParamList> -> <Param> ~ParamList',
+        '<Param> -> <Ident> : <Type> ~Param',
+        '<Block> -> /',
         '<Stmt> -> <Expr>',
         '<Expr> -> ( <Expr> )',
         '<Expr> -> <BinExpr>',
@@ -91,8 +105,10 @@ const main = () => {
         '<BinExpr> -> <T> - <T> ~BinaryExpr',
         '<BinExpr> -> <T> * <T> ~BinaryExpr',
         '<BinExpr> -> <T> / <T> ~BinaryExpr',
-        '<T> -> id ~Ident',
-        '<T> -> num ~Num',
+        '<T> -> <Ident>',
+        '<T> -> <Num>',
+        '<Ident> -> id ~Ident',
+        '<Num> -> num ~Num',
     ];
 
     const builder = new SLRTableBuilder(rawGrammar);
@@ -109,9 +125,10 @@ const main = () => {
         //const input = '0 1'
         // const input = 'a b c'
         const input = `
-        a + 1 ;
-        (b - d) ;
+        func GetMyThings ( id : number ) : number / ;
         `
+        // var aaaaaaa : number = b + c ;
+        // var b : string ;
         const grammar = parseGrammar(rawGrammar);
 
 
