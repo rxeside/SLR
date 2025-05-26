@@ -59,6 +59,11 @@ class SLRTableParser {
         this.tokens = tokens
         this.table = table
         this.grammar = grammar
+
+        // Инициализируем здесь, чтобы избежать undefined в _initialize, если он вызывается не сразу
+        this.inputQueue = [];
+        this.stack = new Stack<StackItem>();
+        this.astStack = new Stack<ASTStackItem>(); // Если используетс
     }
 
     parse(): void {
@@ -96,9 +101,26 @@ class SLRTableParser {
             grammarSymbol: TOKEN_TYPE_TO_GRAMMAR_SYMBOL_MAP[token.type] || token.lexeme,
             token: token,
         }))
+        // Убедимся, что есть позиция для EOF/Grid токена
+        let eofPosition: {line: number, column: number} = {line: 1, column: 0};
+        if (this.tokens.length > 0) {
+            const lastToken = this.tokens[this.tokens.length - 1];
+            eofPosition = {
+                line: lastToken.position.line,
+                column: lastToken.position.column + (lastToken.lexeme ? lastToken.lexeme.length : 0)
+            };
+        } else if (this.inputQueue.length > 0) { // Если tokens пуст, но inputQueue был как-то заполнен (маловероятно)
+            const lastQueueItem = this.inputQueue[this.inputQueue.length-1];
+            if(lastQueueItem && lastQueueItem.token && lastQueueItem.token.position) {
+                eofPosition = {
+                    line: lastQueueItem.token.position.line,
+                    column: lastQueueItem.token.position.column + (lastQueueItem.token.lexeme ? lastQueueItem.token.lexeme.length : 0)
+                };
+            }
+        }
         this.inputQueue.push({
             grammarSymbol: SYMBOL_END,
-            token: {type: Lexeme.EOF, lexeme: SYMBOL_END} as Token},
+            token: {type: Lexeme.EOF, lexeme: SYMBOL_END, position: eofPosition} as Token},
         )
 
         this.stack = new Stack<StackItem>()
@@ -107,23 +129,79 @@ class SLRTableParser {
         this.astStack = new Stack<ASTNode | Token>()
     }
 
+    /**
+     * Вспомогательный метод для получения списка ожидаемых символов (терминалов) для данного состояния.
+     */
+    private _getExpectedSymbolsForState(stateName: string): string[] {
+        const stateTransitions = this.table[stateName];
+        if (stateTransitions) {
+            // Возвращаем только ключи (символы), по которым есть переходы
+            // Можно добавить фильтрацию, чтобы показывать только терминалы, если нужно
+            return Object.keys(stateTransitions).filter(symbol => symbol !== SYMBOL_END || Object.keys(stateTransitions).length === 1); // Показываем # только если это единственный вариант
+        }
+        return [];
+    }
+
     /** Возвращает переход по состоянию и символу, т.е ячейку таблицы на пересечении состояния и символа **/
     private _shift(): string[] {
-        this.currToken = this.inputQueue.shift()!
-        this.currState = this.stack.peek()!.state
+        if (this.inputQueue.length === 0) { // Должно быть обработано SYMBOL_END
+            throw new CompilerError(ErrorCode.PARSER_UNEXPECTED_EOF, {
+                message: "Входная очередь пуста неожиданно (нет символа конца ввода '#')."
+            });
+        }
+        this.currToken = this.inputQueue.shift()!;
 
-        const currAction = this.table[this.currState]?.[this.currToken.grammarSymbol]
+        const stackTop = this.stack.peek();
+        if (!stackTop) {
+            throw new CompilerError(ErrorCode.PARSER_STACK_MISMATCH, { // или PARSER_INTERNAL_ERROR
+                message: "Стек пуст при попытке сдвига. Ошибка инициализации?"
+            });
+        }
+        this.currState = stackTop.state;
+
+        const currAction = this.table[this.currState]?.[this.currToken.grammarSymbol];
+
         if (!currAction || currAction.length === 0) {
-            throw new CompilerError(ErrorCode.PARSER_NO_TRANSITION, {
-                currentState: this.currState,
-                offendingSymbol: this.currToken.grammarSymbol,
-                message: this.currToken.token.lexeme,
-                lineNumber: this.currToken.token.position.line,
-                columnNumber: this.currToken.token.position.column,
-            });        }
+            // --- Вот место для улучшенной ошибки ---
+            const expectedSymbols = this._getExpectedSymbolsForState(this.currState);
+            const {line, column} = this.currToken.token.position;
+            const unexpectedLexeme = this.currToken.token.lexeme;
 
-        return currAction
+            let expectedMessage = "ничего (тупиковое состояние или конец ввода)";
+            if (expectedSymbols.length > 0) {
+                // Фильтруем нетерминалы для более понятного сообщения пользователю
+                const terminalExpected = expectedSymbols
+                    .filter(s => !s.startsWith('<') || s === SYMBOL_END) // Оставляем терминалы и символ конца
+                    .map(s => s === SYMBOL_END ? "конец выражения" : `'${s}'`);
+
+                if (terminalExpected.length > 0) {
+                    expectedMessage = terminalExpected.join(' или ');
+                } else if (expectedSymbols.length > 0) {
+                    // Если остались только нетерминалы, это может указывать на более глубокую проблему
+                    // или на то, что пользователь ожидает ввести что-то, что начнется с этих нетерминалов
+                    expectedMessage = `конструкцию, начинающуюся с ${expectedSymbols.map(s => `'${s}'`).join(' или ')}`;
+                }
+            }
+
+            throw new CompilerError(ErrorCode.PARSER_UNEXPECTED_TOKEN, { // Используем PARSER_UNEXPECTED_TOKEN
+                lineNumber: line,
+                columnNumber: column,
+                offendingSymbol: unexpectedLexeme, // Это то, что пользователь ввел
+                expectedToken: expectedMessage,    // Это то, что грамматика ожидала
+                currentState: this.currState,      // Для отладки
+                // message: `Неожиданный токен '${unexpectedLexeme}'. Ожидалось: ${expectedMessage}.` // Можно убрать, т.к. ErrorReporter это сформирует
+            });
+        }
+
+        // Если это не Reduce действие, и мы хотим строить AST из простых токенов (id, num)
+        // то это место для вызова _addSimpleToAST
+        if (currAction[0][0] !== STATE_REDUCE) {
+            this._addSimpleToAST(this.currToken);
+        }
+
+        return currAction;
     }
+
 
     /** Возвращает правило для свёртки, если текущее действие - свёртка (R(n) или R(n)~insertion) **/
     private _findRuleForReduce(currAction: string[]): ReduceInfo | null {

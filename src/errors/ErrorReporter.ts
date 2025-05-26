@@ -53,6 +53,10 @@ export class ErrorReporter {
                 ErrorCode.PARSER_AST_STACK_ERROR,
                 (ctx) => `Ошибка построения AST: ${ctx.message}`
             ],
+            [
+                ErrorCode.PARSER_UNEXPECTED_TOKEN,
+                (ctx) => `Синтаксическая ошибка. Неожиданный токен '${ctx.offendingSymbol}'. ${ctx.expectedToken ? `Ожидалось: ${ctx.expectedToken}.` : 'Неожиданный ввод.'}`
+            ],
 
             // Построитель таблицы
             [
@@ -84,6 +88,7 @@ export class ErrorReporter {
         ]);
     }
 
+    // Модифицируем вывод местоположения в методе report
     public report(error: CompilerError): void {
         this.errorCount++;
         this.collectedErrors.push(error);
@@ -99,12 +104,13 @@ export class ErrorReporter {
             message = `Неизвестный код ошибки: ${error.code}. ${error.context.message || ''}`;
         }
 
-        let location = "";
+        let locationInfo = "";
+        // Формируем строку с позицией ошибки (1-based для пользователя)
         if (error.context.lineNumber !== undefined) {
-            location = `[${error.context.columnNumber !== undefined ? `${error.context.columnNumber}:` : ''}${error.context.lineNumber}] `
+            locationInfo = `(${error.context.lineNumber}:${(error.context.columnNumber !== undefined ? error.context.columnNumber + 1 : '?')}) `;
         }
 
-        console.error(`Ошибка ${error.code}: ${location}${message}`);
+        console.error(`Ошибка ${error.code} ${locationInfo}: ${message}`);
     }
 
     public hasErrors(): boolean {
