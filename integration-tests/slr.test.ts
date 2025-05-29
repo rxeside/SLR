@@ -112,23 +112,24 @@ describe("SLR Integration Tests", () => {
 });
 
 describe("SLR Integration Tests for Full Grammar", () => {
-    // Актуальная грамматика (скопирована из src/grammar.ts и адаптирована под токены лексера)
     const fullGrammar = [
         "<Program> -> <Statement> <Program>",
         "<Program> -> <Statement>",
-        "<Statement> -> <Matched>",
-        "<Statement> -> <Unmatched>",
-        "<Matched> -> let id : <Type> = <Expression> ;",
-        "<Matched> -> return <Expression> ;",
-        "<Matched> -> if ( <Expression> ) <Matched> else <Matched>",
-        "<Matched> -> if ( <Expression> ) { <Block> } else { <Block> }",
-        "<Matched> -> while ( <Expression> ) <Matched>",
-        "<Matched> -> while ( <Expression> ) { <Block> }",
-        "<Matched> -> function id ( <Params> ) : <Type> <Matched>",
-        "<Matched> -> function id ( <Params> ) : <Type> { <Block> }",
-        "<Matched> -> id ( <Args> ) ;",
-        "<Unmatched> -> if ( <Expression> ) <Statement>",
-        "<Unmatched> -> if ( <Expression> ) <Matched> else <Unmatched>",
+        "<Statement> -> <Declaration>",
+        "<Statement> -> <IfStatement>",
+        "<Statement> -> <WhileStatement>",
+        "<Statement> -> <FunctionDeclaration>",
+        "<Statement> -> <FunctionCall>",
+        "<Statement> -> <ReturnStatement>",
+        "<Statement> -> <Assignment>",
+        "<Declaration> -> let id : <Type> = <Expression> ;",
+        "<ReturnStatement> -> return <Expression> ;",
+        "<Assignment> -> id = <Expression> ;",
+        "<IfStatement> -> if ( <Expression> ) { <Block> }",
+        "<IfStatement> -> if ( <Expression> ) { <Block> } else { <Block> }",
+        "<WhileStatement> -> while ( <Expression> ) { <Block> }",
+        "<FunctionDeclaration> -> function id ( <Params> ) : <Type> { <Block> }",
+        "<FunctionCall> -> id ( <Args> ) ;",
         "<Block> -> <Statement> <Block>",
         "<Block> -> <Statement>",
         "<Block> -> ",
@@ -143,7 +144,6 @@ describe("SLR Integration Tests for Full Grammar", () => {
         "<Type> -> bool",
         "<Type> -> num",
         "<Type> -> string",
-        // Новая иерархия выражений с приоритетами
         "<Expression> -> <LogicExpr>",
         "<LogicExpr> -> <EqualityExpr> && <LogicExpr>",
         "<LogicExpr> -> <EqualityExpr>",
@@ -156,15 +156,16 @@ describe("SLR Integration Tests for Full Grammar", () => {
         "<RelExpr> -> <AddExpr> >= <RelExpr>",
         "<RelExpr> -> <AddExpr>",
         "<AddExpr> -> <MulExpr> + <AddExpr>",
+        "<AddExpr> -> <MulExpr> - <AddExpr>",
         "<AddExpr> -> <MulExpr>",
         "<MulExpr> -> <Factor> * <MulExpr>",
         "<MulExpr> -> <Factor>",
+        "<Factor> -> id",
+        "<Factor> -> id ( <Args> )",
         "<Factor> -> ( <Expression> )",
         "<Factor> -> number",
         "<Factor> -> string",
-        "<Factor> -> bool",
-        "<Factor> -> id",
-        "<Factor> -> id ( <Args> )"
+        "<Factor> -> bool"
     ];
 
     test("parses variable declaration with type", () => {
@@ -490,11 +491,6 @@ describe("SLR Integration Tests for Full Grammar", () => {
     });
 
     test("parses deeply nested if statements", () => {
-        // Этот тест демонстрирует известное ограничение SLR-парсера:
-        // SLR-парсеры не могут корректно обрабатывать некоторые типы вложенных if-else конструкций
-        // из-за проблемы "dangling else" и ограниченной мощности SLR-грамматик.
-        // Это нормальное поведение для SLR-парсера, и тест ожидаемо падает.
-        // Для поддержки таких сложных конструкций потребуется более мощный парсер (например, LALR или LR(1)).
         const lexer = new Lexer();
         const parser = new SLRParser(fullGrammar);
         const input = `
@@ -546,11 +542,6 @@ describe("SLR Integration Tests for Full Grammar", () => {
     });
 
     test("parses complex program with all features", () => {
-        // Этот тест демонстрирует еще одно ограничение SLR-парсера:
-        // SLR-парсеры не могут корректно обрабатывать некоторые сложные комбинации
-        // вложенных конструкций и выражений из-за ограниченной мощности SLR-грамматик.
-        // Это нормальное поведение для SLR-парсера, и тест ожидаемо падает.
-        // Для поддержки таких сложных программ потребуется более мощный парсер.
         const lexer = new Lexer();
         const parser = new SLRParser(fullGrammar);
         const input = `
@@ -622,6 +613,7 @@ describe("SLR Integration Tests for Full Grammar", () => {
         expect(result).toContain("ОШИБКА");
     });
 
+    // TODO: Добавить массивы
     test("parses bubble sort implementation", () => {
         const lexer = new Lexer();
         const parser = new SLRParser(fullGrammar);
