@@ -31,6 +31,7 @@ export const TT = { // Token Types
     OPERATOR_GREATER: '>',
     OPERATOR_LESS_EQUALS: '<=',
     OPERATOR_GREATER_EQUALS: '>=',
+    OPERATOR_AND: '&&',
 
     PUNCT_SEMICOLON: ';',
     PUNCT_COMMA: ',',
@@ -78,6 +79,7 @@ export const tokenSpecifications: [RegExp, string | null][] = [
     [/^!=/, TT.OPERATOR_NOT_EQUALS],
     [/^<=/, TT.OPERATOR_LESS_EQUALS],
     [/^>=/, TT.OPERATOR_GREATER_EQUALS],
+    [/^&&/, TT.OPERATOR_AND],
     [/^\+/, TT.OPERATOR_PLUS],
     [/^\-/, TT.OPERATOR_MINUS],
     [/^\*/, TT.OPERATOR_MULTIPLY],

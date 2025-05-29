@@ -4,21 +4,21 @@ describe("TS-like language (minimal)", () => {
     const grammar = [
         "<Program> -> <Statement>",
         "<Statement> -> let id = <Expression> ;",
-        "<Expression> -> num"
+        "<Expression> -> number"
     ];
 
     test("parses variable declaration", () => {
         // Пример: let x = 42;
-        // Лексер должен разбить на: ["let", "id", "=", "num", ";"]
+        // Лексер должен разбить на: ["let", "id", "=", "number", ";"]
         const parser = new SLRParser(grammar);
-        const input = ["let", "id", "=", "num", ";"];
+        const input = ["let", "id", "=", "number", ";"];
         expect(parser.parse(input)).toBe(true);
     });
 
     test("rejects invalid statement", () => {
         const parser = new SLRParser(grammar);
-        expect(parser.parse(["let", "=", "num", ";"])).toContain("ОШИБКА");
-        expect(parser.parse(["let", "id", "num", ";"])).toContain("ОШИБКА");
+        expect(parser.parse(["let", "=", "number", ";"])).toContain("ОШИБКА");
+        expect(parser.parse(["let", "id", "number", ";"])).toContain("ОШИБКА");
     });
 });
 
@@ -32,26 +32,26 @@ describe("TS-like language (expressions, multiple statements)", () => {
         "<Term> -> <Term> * <Factor>",
         "<Term> -> <Factor>",
         "<Factor> -> ( <Expression> )",
-        "<Factor> -> num",
+        "<Factor> -> number",
         "<Factor> -> id",
         "<Factor> -> id ( <Args> )"
     ];
 
     test("parses multiple variable declarations and expressions", () => {
         const parser = new SLRParser(grammar);
-        expect(parser.parse(["let", "id", "=", "num", ";"])).toBe(true);
-        expect(parser.parse(["let", "id", "=", "id", ";", "let", "id", "=", "num", ";"])).toBe(true);
-        expect(parser.parse(["let", "id", "=", "num", "+", "num", ";"])).toBe(true);
-        expect(parser.parse(["let", "id", "=", "num", "+", "id", "*", "num", ";"])).toBe(true);
-        expect(parser.parse(["let", "id", "=", "(", "num", "+", "id", ")", "*", "num", ";"])).toBe(true);
+        expect(parser.parse(["let", "id", "=", "number", ";"])).toBe(true);
+        expect(parser.parse(["let", "id", "=", "id", ";", "let", "id", "=", "number", ";"])).toBe(true);
+        expect(parser.parse(["let", "id", "=", "number", "+", "number", ";"])).toBe(true);
+        expect(parser.parse(["let", "id", "=", "number", "+", "id", "*", "number", ";"])).toBe(true);
+        expect(parser.parse(["let", "id", "=", "(", "number", "+", "id", ")", "*", "number", ";"])).toBe(true);
     });
 
     test("rejects invalid expressions/statements", () => {
         const parser = new SLRParser(grammar);
-        expect(parser.parse(["let", "id", "=", "+", "num", ";"])).toContain("ОШИБКА");
-        expect(parser.parse(["let", "id", "=", "num", "*", ";"])).toContain("ОШИБКА");
-        expect(parser.parse(["let", "id", "=", "(", "num", "+", ";"])).toContain("ОШИБКА");
-        expect(parser.parse(["let", "id", "=", "num", ";", ";"])).toContain("ОШИБКА");
+        expect(parser.parse(["let", "id", "=", "+", "number", ";"])).toContain("ОШИБКА");
+        expect(parser.parse(["let", "id", "=", "number", "*", ";"])).toContain("ОШИБКА");
+        expect(parser.parse(["let", "id", "=", "(", "number", "+", ";"])).toContain("ОШИБКА");
+        expect(parser.parse(["let", "id", "=", "number", ";", ";"])).toContain("ОШИБКА");
     });
 });
 
@@ -66,27 +66,27 @@ describe("TS-like language (if statement)", () => {
         "<Term> -> <Term> * <Factor>",
         "<Term> -> <Factor>",
         "<Factor> -> ( <Expression> )",
-        "<Factor> -> num",
+        "<Factor> -> number",
         "<Factor> -> id"
     ];
 
     test("parses if statements and variable declarations", () => {
         const parser = new SLRParser(grammar);
-        expect(parser.parse(["let", "id", "=", "num", ";"])).toBe(true);
-        expect(parser.parse(["if", "(", "id", ")", "let", "id", "=", "num", ";"])).toBe(true);
+        expect(parser.parse(["let", "id", "=", "number", ";"])).toBe(true);
+        expect(parser.parse(["if", "(", "id", ")", "let", "id", "=", "number", ";"])).toBe(true);
         expect(parser.parse([
-            "let", "id", "=", "num", ";",
-            "if", "(", "id", "+", "num", ")", "let", "id", "=", "num", ";"
+            "let", "id", "=", "number", ";",
+            "if", "(", "id", "+", "number", ")", "let", "id", "=", "number", ";"
         ])).toBe(true);
         expect(parser.parse([
-            "if", "(", "id", ")", "if", "(", "id", ")", "let", "id", "=", "num", ";"
+            "if", "(", "id", ")", "if", "(", "id", ")", "let", "id", "=", "number", ";"
         ])).toBe(true);
     });
 
     test("rejects invalid if statements", () => {
         const parser = new SLRParser(grammar);
-        expect(parser.parse(["if", "(", ")", "let", "id", "=", "num", ";"])).toContain("ОШИБКА");
-        expect(parser.parse(["if", "id", ")", "let", "id", "=", "num", ";"])).toContain("ОШИБКА");
+        expect(parser.parse(["if", "(", ")", "let", "id", "=", "number", ";"])).toContain("ОШИБКА");
+        expect(parser.parse(["if", "id", ")", "let", "id", "=", "number", ";"])).toContain("ОШИБКА");
         expect(parser.parse(["if", "(", "id", ")", ";"])).toContain("ОШИБКА");
     });
 });
@@ -107,22 +107,22 @@ describe("TS-like language (if-else, return, dangling else resolved)", () => {
         "<Term> -> <Term> * <Factor>",
         "<Term> -> <Factor>",
         "<Factor> -> ( <Expression> )",
-        "<Factor> -> num",
+        "<Factor> -> number",
         "<Factor> -> id",
         "<Factor> -> id ( <Args> )"
     ];
 
     test("parses if-else, return, and variable declarations (dangling else resolved)", () => {
         const parser = new SLRParser(grammar);
-        expect(parser.parse(["let", "id", "=", "num", ";"])).toBe(true);
+        expect(parser.parse(["let", "id", "=", "number", ";"])).toBe(true);
         expect(parser.parse(["return", "id", ";"])).toBe(true);
-        expect(parser.parse(["if", "(", "id", ")", "return", "num", ";"])).toBe(true);
+        expect(parser.parse(["if", "(", "id", ")", "return", "number", ";"])).toBe(true);
         expect(parser.parse([
-            "if", "(", "id", ")", "let", "id", "=", "num", ";", "else", "return", "id", ";"
+            "if", "(", "id", ")", "let", "id", "=", "number", ";", "else", "return", "id", ";"
         ])).toBe(true);
         expect(parser.parse([
-            "let", "id", "=", "num", ";",
-            "if", "(", "id", "+", "num", ")", "return", "num", ";", "else", "let", "id", "=", "id", ";"
+            "let", "id", "=", "number", ";",
+            "if", "(", "id", "+", "number", ")", "return", "number", ";", "else", "let", "id", "=", "id", ";"
         ])).toBe(true);
     });
 
@@ -130,7 +130,7 @@ describe("TS-like language (if-else, return, dangling else resolved)", () => {
         const parser = new SLRParser(grammar);
         expect(parser.parse(["if", "(", "id", ")", "else", "return", "id", ";"])).toContain("ОШИБКА");
         expect(parser.parse(["return", ";"])).toContain("ОШИБКА");
-        expect(parser.parse(["if", "(", "id", ")", "let", "id", "=", "num", ";", "else"])).toContain("ОШИБКА");
+        expect(parser.parse(["if", "(", "id", ")", "let", "id", "=", "number", ";", "else"])).toContain("ОШИБКА");
     });
 });
 
@@ -162,7 +162,7 @@ describe("TS-like language (functions)", () => {
         "<Term> -> <Term> * <Factor>",
         "<Term> -> <Factor>",
         "<Factor> -> ( <Expression> )",
-        "<Factor> -> num",
+        "<Factor> -> number",
         "<Factor> -> id",
         "<Factor> -> id ( <Args> )"
     ];
@@ -172,15 +172,15 @@ describe("TS-like language (functions)", () => {
         // Function declaration without parameters
         expect(parser.parse([
             "function", "id", "(", ")", "{",
-            "return", "num", ";",
+            "return", "number", ";",
             "}"
         ])).toBe(true);
 
         // Function declaration with parameters
         expect(parser.parse([
             "function", "id", "(", "id", ",", "id", ")", "{",
-            "let", "id", "=", "num", ";",
-            "return", "id", "+", "num", ";",
+            "let", "id", "=", "number", ";",
+            "return", "id", "+", "number", ";",
             "}"
         ])).toBe(true);
 
@@ -188,15 +188,15 @@ describe("TS-like language (functions)", () => {
         expect(parser.parse(["id", "(", ")", ";"])).toBe(true);
 
         // Function call with arguments
-        expect(parser.parse(["id", "(", "num", ",", "id", ")", ";"])).toBe(true);
+        expect(parser.parse(["id", "(", "number", ",", "id", ")", ";"])).toBe(true);
 
         // Complex program with functions
         expect(parser.parse([
             "function", "id", "(", "id", ")", "{",
-            "if", "(", "id", ")", "return", "num", ";",
-            "return", "id", "*", "num", ";",
+            "if", "(", "id", ")", "return", "number", ";",
+            "return", "id", "*", "number", ";",
             "}",
-            "let", "id", "=", "id", "(", "num", ")", ";"
+            "let", "id", "=", "id", "(", "number", ")", ";"
         ])).toBe(true);
     });
 
@@ -240,7 +240,7 @@ describe("TS-like language (typed variables and while loop)", () => {
         "<MoreArgs> -> , <Expression> <MoreArgs>",
         "<MoreArgs> -> ",
         "<Type> -> bool",
-        "<Type> -> num",
+        "<Type> -> number",
         "<Type> -> string",
         "<Expression> -> <Expression> + <Term>",
         "<Expression> -> <Expression> == <Term>",
@@ -253,7 +253,7 @@ describe("TS-like language (typed variables and while loop)", () => {
         "<Term> -> <Term> * <Factor>",
         "<Term> -> <Factor>",
         "<Factor> -> ( <Expression> )",
-        "<Factor> -> num",
+        "<Factor> -> number",
         "<Factor> -> string",
         "<Factor> -> bool",
         "<Factor> -> id",
@@ -264,7 +264,7 @@ describe("TS-like language (typed variables and while loop)", () => {
         const parser = new SLRParser(grammar);
         // Typed variable declarations
         expect(parser.parse([
-            "let", "id", ":", "num", "=", "num", ";"
+            "let", "id", ":", "number", "=", "number", ";"
         ])).toBe(true);
         expect(parser.parse([
             "let", "id", ":", "string", "=", "string", ";"
@@ -275,13 +275,13 @@ describe("TS-like language (typed variables and while loop)", () => {
 
         // While loop
         expect(parser.parse([
-            "while", "(", "id", ")", "{", "let", "id", ":", "num", "=", "num", ";", "}"
+            "while", "(", "id", ")", "{", "let", "id", ":", "number", "=", "number", ";", "}"
         ])).toBe(true);
 
         // Complex program with types and while
         expect(parser.parse([
-            "let", "id", ":", "num", "=", "num", ";",
-            "while", "(", "id", ">", "num", ")", "{",
+            "let", "id", ":", "number", "=", "number", ";",
+            "while", "(", "id", ">", "number", ")", "{",
             "let", "id", ":", "string", "=", "string", ";",
             "if", "(", "id", "==", "string", ")", "return", "bool", ";",
             "}"
@@ -289,8 +289,8 @@ describe("TS-like language (typed variables and while loop)", () => {
 
         // Typed function with while
         expect(parser.parse([
-            "function", "id", "(", "id", ":", "num", ")", ":", "bool", "{",
-            "while", "(", "id", ">", "num", ")", "{",
+            "function", "id", "(", "id", ":", "number", ")", ":", "bool", "{",
+            "while", "(", "id", ">", "number", ")", "{",
             "let", "id", ":", "string", "=", "string", ";",
             "}",
             "return", "bool", ";",
@@ -302,11 +302,11 @@ describe("TS-like language (typed variables and while loop)", () => {
         const parser = new SLRParser(grammar);
         // Missing type
         expect(parser.parse([
-            "let", "id", "=", "num", ";"
+            "let", "id", "=", "number", ";"
         ])).toContain("ОШИБКА");
         // Invalid type
         expect(parser.parse([
-            "let", "id", ":", "invalid", "=", "num", ";"
+            "let", "id", ":", "invalid", "=", "number", ";"
         ])).toContain("ОШИБКА");
         // Missing while body
         expect(parser.parse([

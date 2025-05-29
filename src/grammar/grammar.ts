@@ -2,7 +2,7 @@ import { Grammar } from './types';
 import { GrammarParser } from './parser';
 import { removeEpsilonRules } from './preparer';
 import { checkReachable, checkProductive } from './checker';
-import { EOF_SYMBOL } from 'src2/lexer/constants';
+import { EOF_SYMBOL } from '@src/lexer/constants';
 
 /**
  * Полная обработка грамматики: парсинг, удаление ε-правил, минимизация.
