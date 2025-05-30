@@ -1,4 +1,4 @@
-import { ASTBuilder } from '../../src2/ast/builder';
+import { ASTBuilder } from '../../src/ast/builder';
 import {
     Program,
     Block,
@@ -12,7 +12,7 @@ import {
     CallExpr,
     Literal,
     Identifier,
-} from '../../src2/ast/entity';
+} from '../../src/ast/entity';
 import { Token, Lexeme, GrammarRule, Position } from '@common/types';
 
 describe('AST Builder', () => {

@@ -1,4 +1,4 @@
-import { SymbolTable } from '../src2/symbolTable';
+import { SymbolTable } from '../src/symbolTable';
 
 describe('SymbolTable', () => {
     let symbolTable: SymbolTable;
