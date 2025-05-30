@@ -4,7 +4,7 @@ import {SEPARATOR_SPACE, STATE_REDUCE, STATE_START, SYMBOL_END, SYMBOL_TILDE} fr
 import {arrayEqual} from '@common/utils'
 import {ASTNode, Identifier, Literal} from '@src/ast/entity'
 import {ASTBuilder} from '@src/ast/builder'
-import {SymbolTable} from '@src/symbolTable'
+import {SymbolTable} from '@src/symbolTable/symbolTable'
 
 type ASTStackItem = ASTNode | Token
 
