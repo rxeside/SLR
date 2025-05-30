@@ -1,12 +1,16 @@
 import {
     AssignExpr,
     BinaryExpr,
-    Block, CallExpr,
+    Block,
+    CallExpr,
     ConstDecl,
     ForStmt,
-    FuncDecl, Identifier,
-    IfStmt, Literal,
-    Program, UnaryExpr,
+    FuncDecl,
+    Identifier,
+    IfStmt,
+    Literal,
+    Program,
+    UnaryExpr,
     VarDecl,
     WhileStmt,
 } from '@src/ast/entity'
@@ -27,7 +31,6 @@ type ASTVisitor = {
     visitLiteral(node: Literal): any;
     visitIdentifier(node: Identifier): any;
     visitCallExpr(node: CallExpr): any;
-    // ... добавить остальные по мере необходимости
 }
 
 export {
