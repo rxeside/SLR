@@ -13,7 +13,10 @@ import {
     Literal,
     Identifier,
 } from '../../src/ast/entity';
-import { Token, Lexeme, GrammarRule, Position } from '@common/types';
+import { Token } from '../../src/lexer/type';
+import { TT } from '../../src/lexer/constants';
+import { GrammarRule } from '../../src/grammar/types';
+import { Position } from '../../src/ast/builder';
 
 describe('AST Builder', () => {
     const DUMMY_POS: Position = { line: 0, column: 0 };
@@ -37,14 +40,16 @@ describe('AST Builder', () => {
 
         test('должен создавать Block с новой областью видимости', () => {
             const varToken: Token = {
-                type: Lexeme.IDENTIFIER,
-                lexeme: 'x',
-                position: DUMMY_POS
+                type: TT.IDENTIFIER,
+                value: 'x',
+                line: 0,
+                column: 0
             };
             const typeToken: Token = {
-                type: Lexeme.IDENTIFIER,
-                lexeme: 'int',
-                position: DUMMY_POS
+                type: TT.IDENTIFIER,
+                value: 'int',
+                line: 0,
+                column: 0
             };
             const stmt = ASTBuilder.buildNode('VarDecl', [varToken, typeToken], {} as GrammarRule);
             const node = ASTBuilder.buildNode('Block', [stmt], {} as GrammarRule);
@@ -59,9 +64,10 @@ describe('AST Builder', () => {
 
         test('должен создавать Literal', () => {
             const token: Token = {
-                type: Lexeme.INTEGER,
-                lexeme: '42',
-                position: DUMMY_POS
+                type: TT.NUMBER,
+                value: '42',
+                line: 0,
+                column: 0
             };
             const node = ASTBuilder.buildNode('Literal', [token], {} as GrammarRule);
 
@@ -71,9 +77,10 @@ describe('AST Builder', () => {
 
         test('должен создавать Identifier', () => {
             const token: Token = {
-                type: Lexeme.IDENTIFIER,
-                lexeme: 'myVar',
-                position: DUMMY_POS
+                type: TT.IDENTIFIER,
+                value: 'myVar',
+                line: 0,
+                column: 0
             };
             const node = ASTBuilder.buildNode('Ident', [token], {} as GrammarRule);
 
@@ -90,22 +97,25 @@ describe('AST Builder', () => {
         test('должен правильно обрабатывать вложенные области видимости', () => {
             // Глобальная область
             const globalVar: Token = {
-                type: Lexeme.IDENTIFIER,
-                lexeme: 'global',
-                position: DUMMY_POS
+                type: TT.IDENTIFIER,
+                value: 'global',
+                line: 0,
+                column: 0
             };
             const typeToken: Token = {
-                type: Lexeme.IDENTIFIER,
-                lexeme: 'int',
-                position: DUMMY_POS
+                type: TT.IDENTIFIER,
+                value: 'int',
+                line: 0,
+                column: 0
             };
             ASTBuilder.buildNode('VarDecl', [globalVar, typeToken], {} as GrammarRule);
 
             // Создаем блок с локальной переменной
             const localVar: Token = {
-                type: Lexeme.IDENTIFIER,
-                lexeme: 'local',
-                position: DUMMY_POS
+                type: TT.IDENTIFIER,
+                value: 'local',
+                line: 0,
+                column: 0
             };
 
             // Создаем блок и добавляем в него локальную переменную
@@ -120,21 +130,24 @@ describe('AST Builder', () => {
         test('должен правильно обрабатывать области видимости функций', () => {
             // Объявляем функцию
             const funcNameToken: Token = {
-                type: Lexeme.IDENTIFIER,
-                lexeme: 'test',
-                position: DUMMY_POS
+                type: TT.IDENTIFIER,
+                value: 'test',
+                line: 0,
+                column: 0
             };
             
             // Создаем параметр как узел AST
             const paramName: Token = {
-                type: Lexeme.IDENTIFIER,
-                lexeme: 'param',
-                position: DUMMY_POS
+                type: TT.IDENTIFIER,
+                value: 'param',
+                line: 0,
+                column: 0
             };
             const paramType: Token = {
-                type: Lexeme.IDENTIFIER,
-                lexeme: 'int',
-                position: DUMMY_POS
+                type: TT.IDENTIFIER,
+                value: 'int',
+                line: 0,
+                column: 0
             };
 
             // Создаем функцию с параметром
@@ -165,14 +178,16 @@ describe('AST Builder', () => {
         test('должен правильно обрабатывать вызовы системных функций', () => {
             // Вызов iput
             const iputToken: Token = {
-                type: Lexeme.IDENTIFIER,
-                lexeme: 'iput',
-                position: DUMMY_POS
+                type: TT.IDENTIFIER,
+                value: 'iput',
+                line: 0,
+                column: 0
             };
             const argToken: Token = {
-                type: Lexeme.INTEGER,
-                lexeme: '42',
-                position: DUMMY_POS
+                type: TT.NUMBER,
+                value: '42',
+                line: 0,
+                column: 0
             };
             const argNode = ASTBuilder.buildNode('Literal', [argToken], {} as GrammarRule);
 
