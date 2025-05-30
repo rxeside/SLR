@@ -1,6 +1,6 @@
 {
     "scripts": {
-        "slr": "npx tsx src2/main.ts",
+        "slr": "npx tsx src/main.ts",
         "test": "jest",
         "test:ast": "jest integration-tests/ast/builder.test.ts",
         "test:symbol": "jest integration-tests/symbolTable.test.ts",
