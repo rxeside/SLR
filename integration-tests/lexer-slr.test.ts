@@ -122,9 +122,16 @@ describe("SLR Integration Tests for Full Grammar", () => {
         "<Statement> -> <FunctionCall>",
         "<Statement> -> <ReturnStatement>",
         "<Statement> -> <Assignment>",
-        "<Declaration> -> let id : <Type> = <Expression> ;",
+        "<Declaration> -> <BaseDeclaration>",
+        "<Declaration> -> <ArrayDeclaration>",
+        "<BaseDeclaration> -> let id : <BaseType> = <Expression> ;",
+        "<ArrayDeclaration> -> let id : <ArrayType> = <ArrayLiteral> ;",
         "<ReturnStatement> -> return <Expression> ;",
         "<Assignment> -> id = <Expression> ;",
+        "<Assignment> -> <ArrayAccess> = <Expression> ;",
+        "<ArrayAccess> -> id [ <ArrayIndex> ]",
+        "<ArrayAccess> -> <ArrayAccess> [ <ArrayIndex> ]",
+        "<ArrayIndex> -> <Expression>",
         "<IfStatement> -> if ( <Expression> ) { <Block> }",
         "<IfStatement> -> if ( <Expression> ) { <Block> } else { <Block> }",
         "<WhileStatement> -> while ( <Expression> ) { <Block> }",
@@ -141,9 +148,13 @@ describe("SLR Integration Tests for Full Grammar", () => {
         "<Args> -> ",
         "<MoreArgs> -> , <Expression> <MoreArgs>",
         "<MoreArgs> -> ",
-        "<Type> -> bool",
-        "<Type> -> num",
-        "<Type> -> string",
+        "<Type> -> <BaseType>",
+        "<Type> -> <ArrayType>",
+        "<BaseType> -> bool",
+        "<BaseType> -> num",
+        "<BaseType> -> string",
+        "<ArrayType> -> <BaseType> [ ]",
+        "<ArrayType> -> <ArrayType> [ ]",
         "<Expression> -> <LogicExpr>",
         "<LogicExpr> -> <EqualityExpr> && <LogicExpr>",
         "<LogicExpr> -> <EqualityExpr>",
@@ -162,10 +173,19 @@ describe("SLR Integration Tests for Full Grammar", () => {
         "<MulExpr> -> <Factor>",
         "<Factor> -> id",
         "<Factor> -> id ( <Args> )",
+        "<Factor> -> <ArrayAccess>",
         "<Factor> -> ( <Expression> )",
         "<Factor> -> number",
         "<Factor> -> string",
-        "<Factor> -> bool"
+        "<Factor> -> true",
+        "<Factor> -> false",
+        "<ArrayMember> -> <Expression>",
+        "<ArrayMember> -> <ArrayLiteral>",
+        "<ArrayLiteral> -> [ <ArrayElements> ]",
+        "<ArrayElements> -> <ArrayMember> <MoreArrayElements>",
+        "<ArrayElements> -> ",
+        "<MoreArrayElements> -> , <ArrayMember> <MoreArrayElements>",
+        "<MoreArrayElements> -> "
     ];
 
     test("parses variable declaration with type", () => {
@@ -346,9 +366,23 @@ describe("SLR Integration Tests for Full Grammar", () => {
     test("parses function declaration with no parameters", () => {
         const lexer = new Lexer();
         const parser = new SLRParser(fullGrammar);
-        const input = `function f() : bool { return bool; }`;
+        const input = `function f() : bool { return true; }`;
         const tokens = lexer.tokenize(input);
         const tokenTypes = tokens.map(t => t.type);
+        expect(tokenTypes).toEqual([
+            TT.KEYWORD_FUNCTION,
+            TT.IDENTIFIER,
+            TT.PUNCT_LPAREN,
+            TT.PUNCT_RPAREN,
+            TT.PUNCT_COLON,
+            TT.KEYWORD_BOOL,
+            TT.PUNCT_LBRACE,
+            TT.KEYWORD_RETURN,
+            TT.KEYWORD_TRUE,
+            TT.PUNCT_SEMICOLON,
+            TT.PUNCT_RBRACE,
+            TT.EOF
+        ]);
         expect(parser.parse(tokenTypes)).toBe(true);
     });
 
@@ -364,9 +398,21 @@ describe("SLR Integration Tests for Full Grammar", () => {
     test("parses function call with arguments", () => {
         const lexer = new Lexer();
         const parser = new SLRParser(fullGrammar);
-        const input = `foo(1, x, string);`;
+        const input = `foo(1, x, "a_string_arg");`;
         const tokens = lexer.tokenize(input);
         const tokenTypes = tokens.map(t => t.type);
+        expect(tokenTypes).toEqual([
+            TT.IDENTIFIER,
+            TT.PUNCT_LPAREN,
+            TT.NUMBER,
+            TT.PUNCT_COMMA,
+            TT.IDENTIFIER,
+            TT.PUNCT_COMMA,
+            TT.STRING,
+            TT.PUNCT_RPAREN,
+            TT.PUNCT_SEMICOLON,
+            TT.EOF
+        ]);
         expect(parser.parse(tokenTypes)).toBe(true);
     });
 
@@ -382,15 +428,17 @@ describe("SLR Integration Tests for Full Grammar", () => {
     test("parses variable declaration with string and bool", () => {
         const lexer = new Lexer();
         const parser = new SLRParser(fullGrammar);
-        expect(parser.parse(lexer.tokenize(`let s : string = string;`).map(t => t.type))).toBe(true);
-        expect(parser.parse(lexer.tokenize(`let b : bool = bool;`).map(t => t.type))).toBe(true);
+        expect(parser.parse(lexer.tokenize(`let s : string = "test_string";`).map(t => t.type))).toBe(true);
+        expect(parser.parse(lexer.tokenize(`let b : bool = true;`).map(t => t.type))).toBe(true);
+        expect(parser.parse(lexer.tokenize(`let b2 : bool = false;`).map(t => t.type))).toBe(true);
     });
 
     test("parses return with different types", () => {
         const lexer = new Lexer();
         const parser = new SLRParser(fullGrammar);
-        expect(parser.parse(lexer.tokenize(`return string;`).map(t => t.type))).toBe(true);
-        expect(parser.parse(lexer.tokenize(`return bool;`).map(t => t.type))).toBe(true);
+        expect(parser.parse(lexer.tokenize(`return "a_string";`).map(t => t.type))).toBe(true);
+        expect(parser.parse(lexer.tokenize(`return true;`).map(t => t.type))).toBe(true);
+        expect(parser.parse(lexer.tokenize(`return false;`).map(t => t.type))).toBe(true);
     });
 
     test("parses complex expression with operators and parentheses", () => {
@@ -729,16 +777,84 @@ describe("SLR Integration Tests for Full Grammar", () => {
                 let right : num = 10;
                 while (left < right) {
                     if (s[left] != s[right]) {
-                        return bool;
+                        return false;
                     }
                     left = left + 1;
                     right = right - 1;
                 }
-                return bool;
+                return true;
             }
         `;
         const tokens = lexer.tokenize(input);
         const tokenTypes = tokens.map(t => t.type);
         expect(parser.parse(tokenTypes)).toBe(true);
+    });
+
+    test("parses array declarations and operations", () => {
+        const lexer = new Lexer();
+        const parser = new SLRParser(fullGrammar);
+
+        // Test array type declarations
+        expect(parser.parse(lexer.tokenize(`let arr : num[] = [1, 2, 3];`).map(t => t.type))).toBe(true);
+        expect(parser.parse(lexer.tokenize(`let strs : string[] = ["s1", "s2"];`).map(t => t.type))).toBe(true);
+        expect(parser.parse(lexer.tokenize(`let bools : bool[] = [true, false];`).map(t => t.type))).toBe(true);
+        expect(parser.parse(lexer.tokenize(`let emptyArr : num[] = [];`).map(t => t.type))).toBe(true);
+
+        // Test array access
+        expect(parser.parse(lexer.tokenize(`let x : num = arr[0];`).map(t => t.type))).toBe(true);
+        expect(parser.parse(lexer.tokenize(`let y : num = arr[i + 1];`).map(t => t.type))).toBe(true);
+
+        // Test array assignment
+        expect(parser.parse(lexer.tokenize(`arr[0] = 42;`).map(t => t.type))).toBe(true);
+        expect(parser.parse(lexer.tokenize(`arr[i * 2] = arr[j];`).map(t => t.type))).toBe(true);
+
+        // Test nested arrays
+        expect(parser.parse(lexer.tokenize(`let matrix : num[][] = [[1, 2], [3, 4]];`).map(t => t.type))).toBe(true);
+        expect(parser.parse(lexer.tokenize(`let x : num = matrix[0][1];`).map(t => t.type))).toBe(true);
+        expect(parser.parse(lexer.tokenize(`let tensor : num[][][] = [[[1]], [[2],[3]]];`).map(t => t.type))).toBe(true);
+        expect(parser.parse(lexer.tokenize(`let arrTest: num[] = [10, 20]; let val : num = arrTest[0] + arrTest[1];`).map(t => t.type))).toBe(true);
+    });
+
+    test("rejects invalid array operations", () => {
+        const lexer = new Lexer();
+        const parser = new SLRParser(fullGrammar);
+
+        // Test invalid array declarations
+        expect(parser.parse(lexer.tokenize(`let arr : num = [1, 2, 3];`).map(t => t.type))).toContain("ОШИБКА");
+        expect(parser.parse(lexer.tokenize(`let arr : [] = [1, 2, 3];`).map(t => t.type))).toContain("ОШИБКА");
+        expect(parser.parse(lexer.tokenize(`let arr : num[];`).map(t => t.type))).toContain("ОШИБКА");
+
+        // Test invalid array access
+        expect(parser.parse(lexer.tokenize(`let x : num = arr[];`).map(t => t.type))).toContain("ОШИБКА");
+        expect(parser.parse(lexer.tokenize(`let x : num = arr[;`).map(t => t.type))).toContain("ОШИБКА");
+        expect(parser.parse(lexer.tokenize(`let x : num = arr[1,2];`).map(t => t.type))).toContain("ОШИБКА");
+        expect(parser.parse(lexer.tokenize(`let m : num[][]; let x : num = m[0][];`).map(t => t.type))).toContain("ОШИБКА");
+        expect(parser.parse(lexer.tokenize(`let m : num[][]; let x : num = m[][0];`).map(t => t.type))).toContain("ОШИБКА");
+
+        // Test invalid array literals
+        expect(parser.parse(lexer.tokenize(`let arr : num[] = [1, ];`).map(t => t.type))).toContain("ОШИБКА");
+        expect(parser.parse(lexer.tokenize(`let arr : num[] = [, 1];`).map(t => t.type))).toContain("ОШИБКА");
+        expect(parser.parse(lexer.tokenize(`let arr : num[] = [1,,2];`).map(t => t.type))).toContain("ОШИБКА");
+        expect(parser.parse(lexer.tokenize(`let arr : num[] = [1 2];`).map(t => t.type))).toContain("ОШИБКА");
+        expect(parser.parse(lexer.tokenize(`let arr : num[] = [,];`).map(t => t.type))).toContain("ОШИБКА");
+
+        // Test invalid array type definitions
+        expect(parser.parse(lexer.tokenize(`let arr : num[[]] = [1];`).map(t => t.type))).toContain("ОШИБКА");
+    });
+
+    test("rejects array literals in function arguments if not expected as expression", () => {
+        const lexer = new Lexer();
+        const parser = new SLRParser(fullGrammar);
+        const result = parser.parse(lexer.tokenize(`myFunc([1,2,3]);`).map(t => t.type));
+        expect(typeof result).toBe("string");
+        expect(result).toContain("ОШИБКА");
+    });
+
+    test("rejects array literals in return statements if not expected as expression", () => {
+        const lexer = new Lexer();
+        const parser = new SLRParser(fullGrammar);
+        const result = parser.parse(lexer.tokenize(`return [1,2,3];`).map(t => t.type));
+        expect(typeof result).toBe("string");
+        expect(result).toContain("ОШИБКА");
     });
 });
