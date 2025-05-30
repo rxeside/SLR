@@ -1,5 +1,4 @@
 import { SLRParser } from "../slr";
-import { Lexer } from "../../lexer/lexer";
 
 describe("SLRParser", () => {
     test("parses simple arithmetic expression", () => {

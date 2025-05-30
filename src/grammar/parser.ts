@@ -1,4 +1,4 @@
-import { EOF_SYMBOL } from "src2/lexer/constants";
+import { EOF_SYMBOL } from "@src/lexer/constants";
 import { Grammar, GrammarRule } from "./types";
 
 export function isTerminal(symbol: string, nonTerminals: Set<string>): boolean {

@@ -2,6 +2,12 @@ import {ASTVisitor} from '@src/ast/visitor'
 
 // Базовый узел AST
 abstract class ASTNode {
+    public type: string;
+
+    constructor() {
+        this.type = this.constructor.name;
+    }
+
     abstract accept(visitor: ASTVisitor): any;
 }
 

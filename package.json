@@ -1,7 +1,10 @@
 {
     "scripts": {
-        "slr": "npx tsx src2/main.ts",
-        "test": "jest"
+        "slr": "npx tsx src/main.ts",
+        "test": "jest",
+        "test:ast": "jest integration-tests/ast/builder.test.ts",
+        "test:symbol": "jest integration-tests/symbolTable.test.ts",
+        "test:watch": "jest --watch"
     },
     "devDependencies": {
         "@types/graphviz": "^0.0.39",

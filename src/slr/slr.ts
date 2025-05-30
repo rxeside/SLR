@@ -250,17 +250,44 @@ export class SLRParser {
             } else if (act.type === "accept") {
                 return true;
             } else {
-                // Ошибка разбора
-                let expected = [];
+                // Улучшенный вывод ошибки
+                const contextStart = Math.max(0, pos - 3);
+                const contextEnd = Math.min(tokens.length, pos + 3);
+                const context = tokens.slice(contextStart, contextEnd);
+                const contextStr = context.map((t, i) => i === pos - contextStart ? `[${t}]` : t).join(" ");
+
+                // Находим наиболее вероятное ожидаемое действие
                 const acts = this.action.get(state);
+                let expectedAction = "";
                 if (acts) {
-                    for (const [tok, a] of acts.entries()) {
-                        if (a.type === "shift") expected.push(`shift '${tok}'`);
-                        else if (a.type === "reduce") expected.push(`reduce по правилу ${this.grammar.rules[a.rule].nonTerminal} -> ${this.grammar.rules[a.rule].production.join(" ")}`);
-                        else if (a.type === "accept") expected.push("accept");
+                    // Сначала ищем shift действия
+                    const shiftActions = Array.from(acts.entries())
+                        .filter(([_, a]) => a.type === "shift")
+                        .map(([tok, _]) => tok);
+                    
+                    // Затем ищем reduce действия
+                    const reduceActions = Array.from(acts.entries())
+                        .filter(([_, a]) => a.type === "reduce")
+                        .map(([_, a]) => {
+                            if (a.type === "reduce") {
+                                return this.grammar.rules[a.rule].nonTerminal;
+                            }
+                            return "";
+                        })
+                        .filter(nt => nt !== "");
+
+                    if (shiftActions.length > 0) {
+                        expectedAction = `ожидается один из терминалов: ${shiftActions.join(", ")}`;
+                    } else if (reduceActions.length > 0) {
+                        expectedAction = `ожидается reduce по правилу для: ${reduceActions.join(", ")}`;
                     }
                 }
-                return `ОШИБКА. Вход: [${tokens.slice(pos).join(" ") || EOF_SYMBOL}],\n  Состояние: ${state},\n  Текущий токен: '${token}'\n  Ожидалось: ${expected.length ? expected.join(", ") : "нет допустимых действий"}`;
+
+                return `ОШИБКА СИНТАКСИСА
+Контекст: ... ${contextStr} ...
+Текущий токен: '${token}'
+Состояние: ${state}
+${expectedAction ? expectedAction : "нет допустимых действий"}`;
             }
         }
     }

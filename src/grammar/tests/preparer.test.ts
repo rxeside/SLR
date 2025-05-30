@@ -1,6 +1,6 @@
 import { removeEpsilonRules } from '../preparer';
 import { Grammar } from '../types';
-import { EPSILON, EOF_SYMBOL } from '../../lexer/constants';
+import { EPSILON } from '../../lexer/constants';
 
 describe('removeEpsilonRules', () => {
     test('removes epsilon rules (slide example)', () => {

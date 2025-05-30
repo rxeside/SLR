@@ -1,61 +1,301 @@
-import {ASTNode, BinaryExpr, Identifier, Program, Literal, VarDecl} from '@src/ast/entity'
-import {GrammarRule, Token} from '@common/types'
+import {
+    ASTNode,
+    Program,
+    Block,
+    VarDecl,
+    ConstDecl,
+    FuncDecl,
+    Param,
+    AssignExpr,
+    BinaryExpr,
+    UnaryExpr,
+    CallExpr,
+    Literal,
+    Identifier,
+    IfStmt,
+    WhileStmt,
+    ForStmt,
+} from './entity'
+import {GrammarRule, Token, Lexeme, Position} from '@common/types'
+import { SymbolTable } from '../../src2/symbolTable'
+
+// Вспомогательная функция для проверки, является ли объект токеном
+function isToken(obj: any): obj is Token {
+    return obj && typeof obj === 'object' && 'type' in obj && 'lexeme' in obj && 'position' in obj;
+}
+
+// Константа для позиции по умолчанию
+const DUMMY_POS: Position = { line: 0, column: 0 };
 
 class ASTBuilder {
+    private static rootSymbolTable: SymbolTable;
+    private static currentSymbolTable: SymbolTable;
+
+    static initialize() {
+        // Инициализация корневой таблицы символов
+        this.rootSymbolTable = new SymbolTable();
+        this.currentSymbolTable = this.rootSymbolTable;
+
+        // Добавление системных функций (аналогично C++ версии)
+        this.rootSymbolTable.add(
+            'iput',
+            'function',
+            undefined,
+            true,
+            ['int'],
+            'void',
+            true,
+            true
+        );
+
+        this.rootSymbolTable.add(
+            'iget',
+            'function',
+            undefined,
+            true,
+            [],
+            'int',
+            true,
+            true
+        );
+    }
+
     static buildNode(actionName: string, children: (ASTNode | Token)[], rule: GrammarRule): ASTNode {
-        // console.log(`_createASTNode: action=${actionName}, children=`, children.map(c => c instanceof ASTNode ? c.constructor.name : c));
+        // Инициализируем таблицу символов при первом вызове
+        if (!this.rootSymbolTable) {
+            this.initialize();
+        }
+
         switch (actionName) {
             case 'Program':
-                // Expects an array of statement ASTNodes
-                // If <S> is the start symbol for statements
-                // And Z -> <S> # ~Program, then children will contain the ASTNode for <S>
-                // If Z -> <block_of_statements> # ~Program, children = [BlockNode]
-                const statements = children.filter(c => c instanceof ASTNode) as ASTNode[];
-                return new Program(statements);
+                // Сбрасываем текущую таблицу символов на глобальную
+                this.currentSymbolTable = this.rootSymbolTable;
+                const programStatements = children.filter(c => c instanceof ASTNode);
+                const program = new Program(programStatements as ASTNode[]);
+                return program;
+
+            case 'Block':
+                // Создаем новую область видимости для блока с уникальным именем
+                const blockName = `block_${Math.random().toString(36).substr(2, 9)}`;
+                this.currentSymbolTable.enterScope(blockName);
+                
+                // Обрабатываем все дочерние узлы в новой области видимости
+                const blockStatements = children.filter(c => c instanceof ASTNode).map(child => {
+                    if (child instanceof VarDecl) {
+                        // Создаем новую VarDecl с теми же параметрами
+                        const varDecl = this.buildNode('VarDecl', [
+                            { type: Lexeme.IDENTIFIER, lexeme: child.name, position: DUMMY_POS },
+                            { type: Lexeme.IDENTIFIER, lexeme: child.type, position: DUMMY_POS }
+                        ], {} as GrammarRule);
+                        return varDecl;
+                    }
+                    return child;
+                });
+                
+                // Создаем блок
+                const block = new Block(blockStatements);
+                
+                // Возвращаемся в родительскую область видимости
+                this.currentSymbolTable.exitScope();
+                return block;
+
+            case 'FuncDecl':
+                let funcName: string;
+                let funcParams: Param[] = [];
+                let funcReturnType = 'void';
+                let funcBody: Block | undefined;
+
+                // Получаем имя функции
+                if (children[0] instanceof Identifier) {
+                    funcName = (children[0] as Identifier).name;
+                } else if (isToken(children[0]) && children[0].type === Lexeme.IDENTIFIER) {
+                    funcName = children[0].lexeme;
+                } else {
+                    throw new Error("FuncDecl: Ожидался идентификатор имени функции.");
+                }
+
+                // Добавляем функцию в глобальную таблицу символов
+                const funcEntry = this.rootSymbolTable.add(
+                    funcName,
+                    'function',
+                    undefined,
+                    true, // isFunction = true
+                    [], // Временно пустой массив параметров
+                    funcReturnType,
+                    true // isFunctionDefined = true
+                );
+
+                if (!funcEntry) {
+                    throw new Error(`Функция ${funcName} уже объявлена`);
+                }
+
+                // Создаем новую область видимости для функции
+                const functionScope = `function_${funcName}`;
+                this.currentSymbolTable.enterScope(functionScope);
+
+                // Обрабатываем параметры и тело функции
+                for (let i = 1; i < children.length; i++) {
+                    const child = children[i];
+                    if (child instanceof Block) {
+                        // Обрабатываем блок в текущей области видимости функции
+                        funcBody = this.buildNode('Block', child.statements, {} as GrammarRule) as Block;
+                    } else if (isToken(child) && child.type === Lexeme.IDENTIFIER) {
+                        funcReturnType = child.lexeme;
+                        // Обновляем тип возврата в записи функции
+                        if (funcEntry) {
+                            funcEntry.returnType = funcReturnType;
+                        }
+                    } else if (child instanceof VarDecl) {
+                        const param = new Param(child.name, child.type);
+                        funcParams.push(param);
+                        
+                        // Добавляем параметр в область видимости функции
+                        const paramEntry = this.currentSymbolTable.add(
+                            param.name,
+                            param.type,
+                            undefined,
+                            false // isFunction = false для параметров
+                        );
+
+                        if (!paramEntry) {
+                            throw new Error(`Параметр ${param.name} уже объявлен в функции`);
+                        }
+                    }
+                }
+
+                // Обновляем информацию о параметрах в записи функции
+                if (funcEntry) {
+                    funcEntry.paramTypes = funcParams.map(p => p.type);
+                    funcEntry.argCount = funcParams.length;
+                }
+
+                // Возвращаемся в родительскую область видимости
+                this.currentSymbolTable.exitScope();
+
+                return new FuncDecl(funcName, funcParams, funcReturnType, funcBody || new Block([]));
+
+            case 'VarDecl':
+                const varName = (children[0] instanceof Identifier) 
+                    ? (children[0] as Identifier).name 
+                    : (isToken(children[0]) ? children[0].lexeme : '');
+                
+                const varType = (children[1] instanceof Identifier)
+                    ? (children[1] as Identifier).name
+                    : (isToken(children[1]) ? children[1].lexeme : '');
+
+                const varInitializer = children[2] instanceof ASTNode ? children[2] : undefined;
+
+                // Добавляем переменную в текущую область видимости
+                const varEntry = this.currentSymbolTable.add(
+                    varName,
+                    varType,
+                    varInitializer instanceof Literal ? (varInitializer as Literal).value : undefined,
+                    false // isFunction = false для переменных
+                );
+
+                if (!varEntry) {
+                    throw new Error(`Переменная ${varName} уже объявлена в текущей области видимости`);
+                }
+
+                return new VarDecl(varName, varType, varInitializer);
+
+            case 'CallExpr':
+                const calleeName = (children[0] instanceof Identifier)
+                    ? (children[0] as Identifier).name
+                    : (isToken(children[0]) ? children[0].lexeme : '');
+
+                // Проверяем существование функции в глобальной таблице символов
+                const funcSymbol = this.rootSymbolTable.lookupGlobal(calleeName);
+                if (!funcSymbol || !funcSymbol.isFunction) {
+                    throw new Error(`Функция ${calleeName} не объявлена`);
+                }
+
+                const args = children.slice(1).filter(c => c instanceof ASTNode) as ASTNode[];
+
+                // Проверяем количество аргументов
+                if (funcSymbol.argCount !== undefined && args.length !== funcSymbol.argCount) {
+                    throw new Error(`Неверное количество аргументов при вызове функции ${calleeName}. Ожидалось: ${funcSymbol.argCount}, получено: ${args.length}`);
+                }
+
+                return new CallExpr(calleeName, args);
+
+            case 'AssignExpr':
+                const assignName = (children[0] instanceof Identifier)
+                    ? (children[0] as Identifier).name
+                    : (isToken(children[0]) ? children[0].lexeme : '');
+
+                // Проверяем существование переменной в текущей области видимости
+                const assignSymbol = this.rootSymbolTable.lookup(assignName);
+                if (!assignSymbol) {
+                    throw new Error(`Переменная ${assignName} не объявлена`);
+                }
+
+                const assignValue = children[1] as ASTNode;
+                return new AssignExpr(assignName, assignValue);
 
             case 'BinaryExpr':
-                // For a rule like <E> -> <E> + <T> ~BinaryExpr
-                // children should be [ENode, PlusToken, TNode]
                 if (children.length === 3 &&
                     children[0] instanceof ASTNode &&
-                    !(children[1] instanceof ASTNode) && // child[1] is a Token (operator)
+                    isToken(children[1]) &&
                     children[2] instanceof ASTNode) {
                     const left = children[0] as ASTNode;
-                    const operator = (children[1] as Token).lexeme;
+                    const operator = children[1].lexeme;
                     const right = children[2] as ASTNode;
                     return new BinaryExpr(left, operator, right);
                 }
-                    // For a rule like <S> -> id + id ~BinaryExpr
-                // children should be [IdentifierNode, PlusToken, IdentifierNode]
-                else if (children.length === 3 &&
-                    children[0] instanceof Identifier &&
-                    !(children[1] instanceof ASTNode) && // Token
-                    children[2] instanceof Identifier) {
-                    const left = children[0] as Identifier;
-                    const operator = (children[1] as Token).lexeme;
-                    const right = children[2] as Identifier;
-                    return new BinaryExpr(left, operator, right);
-                }
                 throw new Error(
-                    `Invalid children for BinaryExpr action. Rule: ${rule.left} -> ${rule.right.join(' ')}. Children: ${JSON.stringify(children.map(c => c instanceof ASTNode ? c.constructor.name : c))}`
+                    `Invalid children for BinaryExpr action. Rule: ${rule.left} -> ${rule.right.join(' ')}. Children: ${JSON.stringify(children.map(c => c instanceof ASTNode ? c.constructor.name : (isToken(c) ? c.lexeme : 'unknown')))}`
                 );
 
-            case 'Ident':
-                // For a rule like <T> -> id ~Ident
-                // children should be [IdentifierNode] (already created by _handleInsertion)
-                if (children.length === 1 && children[0] instanceof Identifier) {
-                    return children[0];
+            case 'UnaryExpr':
+                if (children.length === 2 &&
+                    isToken(children[0]) &&
+                    children[1] instanceof ASTNode) {
+                    return new UnaryExpr(children[0].lexeme, children[1] as ASTNode);
                 }
-                throw new Error(`Invalid children for Ident action. Expected IdentifierNode. Got: ${JSON.stringify(children)}`);
+                throw new Error(`Invalid children for UnaryExpr action.`);
 
-            // Add more cases for other AST node types based on your grammar actions
-            // E.g. case 'VarDecl':
-            // E.g. case 'Assignment':
-            // E.g. case 'IfStatement':
+            case 'Literal':
+                if (children.length === 1 && isToken(children[0])) {
+                    const token = children[0];
+                    if (token.type === Lexeme.INTEGER) return new Literal(parseInt(token.lexeme, 10));
+                    if (token.type === Lexeme.FLOAT) return new Literal(parseFloat(token.lexeme));
+                    if (token.type === Lexeme.STRING) return new Literal(token.lexeme);
+                    if (token.type === Lexeme.TRUE) return new Literal(true);
+                    if (token.type === Lexeme.FALSE) return new Literal(false);
+                    if (token.lexeme === 'null') return new Literal(null);
+                }
+                throw new Error(`Invalid children for Literal action. Expected LiteralNode or a value Token. Got: ${JSON.stringify(children)}`);
+
+            case 'Ident':
+                if (children.length === 1 && isToken(children[0]) && children[0].type === Lexeme.IDENTIFIER) {
+                    return new Identifier(children[0].lexeme);
+                }
+                throw new Error(`Invalid children for Identifier action. Expected Identifier Token. Got: ${JSON.stringify(children)}`);
+
+            case 'Num':
+                if (children.length === 1 && isToken(children[0]) &&
+                    (children[0].type === Lexeme.INTEGER || children[0].type === Lexeme.FLOAT)) {
+                    const tokenVal = children[0].lexeme;
+                    const numVal = children[0].type === Lexeme.INTEGER ? parseInt(tokenVal, 10) : parseFloat(tokenVal);
+                    return new Literal(numVal);
+                }
+                throw new Error(`Invalid children for Num action. Expected LiteralNode or Number Token. Got: ${JSON.stringify(children)}`);
 
             default:
                 throw new Error(`Unknown AST action name: ${actionName}`);
         }
+    }
+
+    static getCurrentSymbolTable(): SymbolTable {
+        return this.rootSymbolTable;
+    }
+
+    static getRootSymbolTable(): SymbolTable {
+        if (!this.rootSymbolTable) {
+            this.initialize();
+        }
+        return this.rootSymbolTable;
     }
 }
 

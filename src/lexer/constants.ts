@@ -31,6 +31,7 @@ export const TT = { // Token Types
     OPERATOR_GREATER: '>',
     OPERATOR_LESS_EQUALS: '<=',
     OPERATOR_GREATER_EQUALS: '>=',
+    OPERATOR_AND: '&&',
 
     PUNCT_SEMICOLON: ';',
     PUNCT_COMMA: ',',
@@ -38,6 +39,8 @@ export const TT = { // Token Types
     PUNCT_RPAREN: ')',
     PUNCT_LBRACE: '{',
     PUNCT_RBRACE: '}',
+    PUNCT_LBRACKET: '[',
+    PUNCT_RBRACKET: ']',
     PUNCT_COLON: ':',
 
     EOF: EOF_SYMBOL, // Используем общий EOF_SYMBOL
@@ -71,6 +74,8 @@ export const tokenSpecifications: [RegExp, string | null][] = [
     [/^\)/, TT.PUNCT_RPAREN],
     [/^\{/, TT.PUNCT_LBRACE],
     [/^\}/, TT.PUNCT_RBRACE],
+    [/^\[/, TT.PUNCT_LBRACKET],
+    [/^\]/, TT.PUNCT_RBRACKET],
     [/^:/, TT.PUNCT_COLON],
 
     // Операторы
@@ -78,6 +83,7 @@ export const tokenSpecifications: [RegExp, string | null][] = [
     [/^!=/, TT.OPERATOR_NOT_EQUALS],
     [/^<=/, TT.OPERATOR_LESS_EQUALS],
     [/^>=/, TT.OPERATOR_GREATER_EQUALS],
+    [/^&&/, TT.OPERATOR_AND],
     [/^\+/, TT.OPERATOR_PLUS],
     [/^\-/, TT.OPERATOR_MINUS],
     [/^\*/, TT.OPERATOR_MULTIPLY],
