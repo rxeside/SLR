@@ -20,6 +20,8 @@ export const TT = { // Token Types
     STRING: 'string',
     BOOLEAN: 'bool',
 
+    STRING_LITERAL: 'STRING_LITERAL',
+
     OPERATOR_PLUS: '+',
     OPERATOR_MINUS: '-',
     OPERATOR_MULTIPLY: '*',
@@ -101,4 +103,6 @@ export const tokenSpecifications: [RegExp, string | null][] = [
     // Идентификаторы (должны идти после ключевых слов)
     // Начинаются с буквы или _, затем буквы, цифры или _
     [/^[a-zA-Z_][a-zA-Z0-9_]*/, TT.IDENTIFIER],
+
+    [/^"([^"\\]|\\.)*"/, TT.STRING_LITERAL],
 ];
