@@ -1,7 +1,8 @@
-export const EOF_SYMBOL = '$'; // Символ конца файла
-export const EPSILON = 'ε'; // Символ для эпсилон (можно использовать пустую строку в грамматике)
+const EOF_SYMBOL = '$';
+const EPSILON = 'epsilon';
 
-export const TT = { // Token Types
+const TT = {
+    // Keywords
     KEYWORD_LET: 'let',
     KEYWORD_CONST: 'const',
     KEYWORD_FUNCTION: 'function',
@@ -11,94 +12,97 @@ export const TT = { // Token Types
     KEYWORD_RETURN: 'return',
     KEYWORD_BOOL: 'bool',
     KEYWORD_NUM: 'num',
-    KEYWORD_STRING: 'string',
+    KEYWORD_STRING_TYPE: 'string',
     KEYWORD_TRUE: 'true',
     KEYWORD_FALSE: 'false',
+    KEYWORD_VOID: 'void',
 
-    IDENTIFIER: 'id',
-    NUMBER: 'number',
-    STRING: 'string',
-    BOOLEAN: 'bool',
+    UNKNOWN: 'UNKNOWN',
 
-    OPERATOR_PLUS: '+',
-    OPERATOR_MINUS: '-',
-    OPERATOR_MULTIPLY: '*',
-    OPERATOR_DIVIDE: '/',
-    OPERATOR_ASSIGN: '=',
-    OPERATOR_EQUALS: '==',
-    OPERATOR_NOT_EQUALS: '!=',
-    OPERATOR_LESS: '<',
-    OPERATOR_GREATER: '>',
-    OPERATOR_LESS_EQUALS: '<=',
-    OPERATOR_GREATER_EQUALS: '>=',
-    OPERATOR_AND: '&&',
-
-    PUNCT_SEMICOLON: ';',
-    PUNCT_COMMA: ',',
+    // Punctuators
     PUNCT_LPAREN: '(',
     PUNCT_RPAREN: ')',
     PUNCT_LBRACE: '{',
     PUNCT_RBRACE: '}',
     PUNCT_LBRACKET: '[',
     PUNCT_RBRACKET: ']',
+    PUNCT_COMMA: ',',
     PUNCT_COLON: ':',
+    PUNCT_SEMICOLON: ';',
+    PUNCT_PLUS: '+',
+    PUNCT_MINUS: '-',
+    PUNCT_MUL: '*',
+    PUNCT_DIV: '/',
 
-    EOF: EOF_SYMBOL, // Используем общий EOF_SYMBOL
-    UNKNOWN: 'UNKNOWN', // Для непредвиденных символов
-    NULL: null, // для комментов
+    // Operators
+    OP_ASSIGN: '=',
+    OP_EQ: '==',
+    OP_NEQ: '!=',
+    OP_LT: '<',
+    OP_GT: '>',
+    OP_LTE: '<=',
+    OP_GTE: '>=',
+    OP_AND: '&&',
+    OP_OR: '||',
+    OP_NOT: '!',
+
+    // backward compatibility for tests
+    OPERATOR_PLUS: '+',
+    OPERATOR_MINUS: '-',
+    OPERATOR_MULTIPLY: '*',
+    OPERATOR_DIVIDE: '/',
+    OPERATOR_ASSIGN: '=',
+
+    // Literals & Identifiers
+    IDENTIFIER: 'id',
+    NUMBER: 'number',
+    STRING: 'string',
+
+    // Misc
+    EOF: EOF_SYMBOL,
+    NULL: null,
 };
 
-export const tokenSpecifications: [RegExp, string | null][] = [
-    // Пробельные символы и комментарии (игнорируются, тип null)
-    [/^\s+/, null], // Пробелы, табы, новые строки
-    [/^\/\/.*/, null], // Однострочные комментарии
+const tokenSpecifications: [RegExp, string | null][] = [
+    [/^\s+/, null], // Пробелы
+    [/^\/\/.*/, null], // Комментарии
+    [/^\n/, null], // Новая строка
 
-    // Ключевые слова
-    [/^let\b/, TT.KEYWORD_LET],
-    [/^const\b/, TT.KEYWORD_CONST],
-    [/^function\b/, TT.KEYWORD_FUNCTION],
-    [/^if\b/, TT.KEYWORD_IF],
-    [/^else\b/, TT.KEYWORD_ELSE],
-    [/^while\b/, TT.KEYWORD_WHILE],
-    [/^return\b/, TT.KEYWORD_RETURN],
-    [/^bool\b/, TT.KEYWORD_BOOL],
-    [/^num\b/, TT.KEYWORD_NUM],
-    [/^string\b/, TT.KEYWORD_STRING],
-    [/^true\b/, TT.KEYWORD_TRUE],
-    [/^false\b/, TT.KEYWORD_FALSE],
-
-    // Пунктуация
-    [/^;/, TT.PUNCT_SEMICOLON],
-    [/^,/, TT.PUNCT_COMMA],
+    // Punctuators
     [/^\(/, TT.PUNCT_LPAREN],
     [/^\)/, TT.PUNCT_RPAREN],
     [/^\{/, TT.PUNCT_LBRACE],
     [/^\}/, TT.PUNCT_RBRACE],
     [/^\[/, TT.PUNCT_LBRACKET],
     [/^\]/, TT.PUNCT_RBRACKET],
+    [/^,/, TT.PUNCT_COMMA],
     [/^:/, TT.PUNCT_COLON],
+    [/^;/, TT.PUNCT_SEMICOLON],
 
-    // Операторы
-    [/^==/, TT.OPERATOR_EQUALS],
-    [/^!=/, TT.OPERATOR_NOT_EQUALS],
-    [/^<=/, TT.OPERATOR_LESS_EQUALS],
-    [/^>=/, TT.OPERATOR_GREATER_EQUALS],
-    [/^&&/, TT.OPERATOR_AND],
-    [/^\+/, TT.OPERATOR_PLUS],
-    [/^\-/, TT.OPERATOR_MINUS],
-    [/^\*/, TT.OPERATOR_MULTIPLY],
-    [/^\//, TT.OPERATOR_DIVIDE],
-    [/^=/, TT.OPERATOR_ASSIGN],
-    [/^</, TT.OPERATOR_LESS],
-    [/^>/, TT.OPERATOR_GREATER],
-
-    // Строки (в двойных кавычках)
+    // Operators
+    [/^==/, TT.OP_EQ],
+    [/^!=/, TT.OP_NEQ],
+    [/^<=/, TT.OP_LTE],
+    [/^>=/, TT.OP_GTE],
+    [/^&&/, TT.OP_AND],
+    [/^\|\|/, TT.OP_OR],
+    [/^!/, TT.OP_NOT],
+    [/^=/, TT.OP_ASSIGN],
+    [/^\+/, TT.PUNCT_PLUS],
+    [/^-/, TT.PUNCT_MINUS],
+    [/^\*/, TT.PUNCT_MUL],
+    [/^\//, TT.PUNCT_DIV],
+    [/^</, TT.OP_LT],
+    [/^>/, TT.OP_GT],
+    
+    [/^\d+/, TT.NUMBER],
     [/^"[^"]*"/, TT.STRING],
-
-    // Числа (целые и с точкой)
-    [/^[0-9]+(\.[0-9]+)?/, TT.NUMBER],
-
-    // Идентификаторы (должны идти после ключевых слов)
-    // Начинаются с буквы или _, затем буквы, цифры или _
     [/^[a-zA-Z_][a-zA-Z0-9_]*/, TT.IDENTIFIER],
 ];
+
+export {
+    TT,
+    EOF_SYMBOL,
+    EPSILON,
+    tokenSpecifications
+};

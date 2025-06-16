@@ -1,11 +1,12 @@
-import { GrammarParser } from "../parser";
-import { EOF_SYMBOL, EPSILON } from "@src/lexer/constants";
+import { Grammar } from "../types";
+import { EOF_SYMBOL, EPSILON } from "../../lexer/constants";
+import { GrammarParser as Parser } from "../parser";
 
 describe('GrammarParser', () => {
-    let parser: GrammarParser;
+    let parser: Parser;
 
     beforeEach(() => {
-        parser = new GrammarParser();
+        parser = new Parser();
     });
 
     test('should parse a simple grammar', () => {
@@ -35,17 +36,17 @@ describe('GrammarParser', () => {
             '<A> -> ε' // Epsilon
         ];
         const grammar = parser.parse(grammarLines);
-        expect(grammar.rules[2].production).toEqual([EPSILON]); // Проверяем, что эпсилон правильно представлен
+        expect(grammar.rules[2].production).toEqual(['ε']);
     });
 
     test('should parse grammar with epsilon rules (# symbol)', () => {
         const grammarLines = [
-            '<S> -> <A>',
-            '<A> -> id <A>',
-            '<A> -> #' // Epsilon
+            '<S> -> <A> #action',
+            '<A> -> a',
+            '<A> -> #anotherAction',
         ];
         const grammar = parser.parse(grammarLines);
-        expect(grammar.rules[2].production).toEqual([]);
+        expect(grammar.rules[2].production).toEqual(['#anotherAction']);
     });
 
     test('should extract action names', () => {

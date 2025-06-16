@@ -71,7 +71,7 @@ class Param {
 }
 
 class AssignExpr extends ASTNode {
-    constructor(public name: string, public value: ASTNode) {
+    constructor(public name: Identifier | ArrayAccess, public value: ASTNode) {
         super();
     }
 
@@ -170,6 +170,56 @@ class ForStmt extends ASTNode {
     }
 }
 
+class ReturnStmt extends ASTNode {
+    constructor(public value: ASTNode) {
+        super();
+    }
+
+    accept(visitor: ASTVisitor) {
+        return visitor.visitReturnStmt(this);
+    }
+}
+
+class ArrayLiteral extends ASTNode {
+    constructor(public elements: ASTNode[]) {
+        super();
+    }
+
+    accept(visitor: ASTVisitor) {
+        return visitor.visitArrayLiteral(this);
+    }
+}
+
+class ArrayAccess extends ASTNode {
+    constructor(public array: ASTNode, public index: ASTNode) {
+        super();
+    }
+
+    accept(visitor: ASTVisitor) {
+        return visitor.visitArrayAccess(this);
+    }
+}
+
+class ParamList extends ASTNode {
+    constructor(public params: Param[]) {
+        super();
+    }
+
+    accept(visitor: ASTVisitor) {
+        throw new Error("Method not implemented.");
+    }
+}
+
+class ArgList extends ASTNode {
+    constructor(public args: ASTNode[]) {
+        super();
+    }
+
+    accept(visitor: ASTVisitor): any {
+        throw new Error("Method not implemented.");
+    }
+}
+
 export {
     ASTNode,
     Program,
@@ -187,4 +237,9 @@ export {
     IfStmt,
     WhileStmt,
     ForStmt,
+    ReturnStmt,
+    ArrayLiteral,
+    ArrayAccess,
+    ParamList,
+    ArgList,
 }

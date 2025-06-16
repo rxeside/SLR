@@ -1,4 +1,6 @@
 import {
+    ArrayAccess,
+    ArrayLiteral,
     AssignExpr,
     BinaryExpr,
     Block,
@@ -10,6 +12,7 @@ import {
     IfStmt,
     Literal,
     Program,
+    ReturnStmt,
     UnaryExpr,
     VarDecl,
     WhileStmt,
@@ -25,12 +28,15 @@ type ASTVisitor = {
     visitIfStmt(node: IfStmt): any;
     visitWhileStmt(node: WhileStmt): any;
     visitForStmt(node: ForStmt): any;
+    visitReturnStmt(node: ReturnStmt): any;
     visitAssign(node: AssignExpr): any;
     visitBinaryExpr(node: BinaryExpr): any;
     visitUnaryExpr(node: UnaryExpr): any;
     visitLiteral(node: Literal): any;
     visitIdentifier(node: Identifier): any;
     visitCallExpr(node: CallExpr): any;
+    visitArrayLiteral(node: ArrayLiteral): any;
+    visitArrayAccess(node: ArrayAccess): any;
 }
 
 export {

@@ -1,6 +1,9 @@
 import { Grammar } from "../grammar/types";
 import { processGrammar } from "../grammar/grammar";
 import { EOF_SYMBOL } from "../lexer/constants";
+import { Token } from "../lexer/type";
+import { ASTBuilder } from '../ast/builder';
+import { ASTNode, Program } from "../ast/entity";
 
 // Типы для таблиц
 export type Action = { type: "shift", to: number } | { type: "reduce", rule: number } | { type: "accept" } | { type: "error" };
@@ -227,67 +230,70 @@ export class SLRParser {
         this.debug = debug;
     }
 
-    // tokens: массив терминалов (строк)
-    parse(tokens: string[]): boolean | string {
-        const stack: number[] = [0];
+    parse(tokens: Token[]): Program | string {
+        const stateStack: number[] = [0];
+        const valueStack: (Token | ASTNode)[] = [];
+
+        // Add EOF token for the parser
+        const inputTokens = [...tokens, { type: EOF_SYMBOL, value: 'EOF', line: -1, column: -1 }];
+        
         let pos = 0;
         while (true) {
-            const state = stack[stack.length - 1];
-            const token = tokens[pos] ?? EOF_SYMBOL;
-            const act = this.action.get(state)?.get(token) ?? { type: "error" };
+            const state = stateStack[stateStack.length - 1];
+            const currentToken = inputTokens[pos];
+            
+            const act = this.action.get(state)?.get(currentToken.type) ?? { type: "error" };
+
+            if (this.debug) {
+                console.log(`State: ${state}, Token: ${currentToken.type}, Action: ${act.type}`);
+            }
+
             if (act.type === "shift") {
-                stack.push(act.to);
+                stateStack.push(act.to);
+                valueStack.push(currentToken);
                 pos++;
             } else if (act.type === "reduce") {
                 const rule = this.grammar.rules[act.rule];
-                for (let i = 0; i < rule.production.length; i++) stack.pop();
-                const prev = stack[stack.length - 1];
-                const gotoState = this.goto.get(prev)?.get(rule.nonTerminal);
-                if (gotoState === undefined) {
-                    return `ОШИБКА. Не удалось перейти по GOTO(${prev}, ${rule.nonTerminal}).\nВход: [${tokens.slice(pos).join(" ") || EOF_SYMBOL}], состояние: ${state}, токен: '${token}', правило: ${rule.nonTerminal} -> ${rule.production.join(" ")}`;
-                }
-                stack.push(gotoState);
-            } else if (act.type === "accept") {
-                return true;
-            } else {
-                // Улучшенный вывод ошибки
-                const contextStart = Math.max(0, pos - 3);
-                const contextEnd = Math.min(tokens.length, pos + 3);
-                const context = tokens.slice(contextStart, contextEnd);
-                const contextStr = context.map((t, i) => i === pos - contextStart ? `[${t}]` : t).join(" ");
+                const children: (Token | ASTNode)[] = [];
 
-                // Находим наиболее вероятное ожидаемое действие
-                const acts = this.action.get(state);
-                let expectedAction = "";
-                if (acts) {
-                    // Сначала ищем shift действия
-                    const shiftActions = Array.from(acts.entries())
-                        .filter(([_, a]) => a.type === "shift")
-                        .map(([tok, _]) => tok);
-                    
-                    // Затем ищем reduce действия
-                    const reduceActions = Array.from(acts.entries())
-                        .filter(([_, a]) => a.type === "reduce")
-                        .map(([_, a]) => {
-                            if (a.type === "reduce") {
-                                return this.grammar.rules[a.rule].nonTerminal;
-                            }
-                            return "";
-                        })
-                        .filter(nt => nt !== "");
-
-                    if (shiftActions.length > 0) {
-                        expectedAction = `ожидается один из терминалов: ${shiftActions.join(", ")}`;
-                    } else if (reduceActions.length > 0) {
-                        expectedAction = `ожидается reduce по правилу для: ${reduceActions.join(", ")}`;
+                if (rule.production.length > 0) {
+                    for (let i = 0; i < rule.production.length; i++) {
+                        stateStack.pop();
+                        children.push(valueStack.pop()!);
                     }
+                    children.reverse();
                 }
 
-                return `ОШИБКА СИНТАКСИСА
-Контекст: ... ${contextStr} ...
-Текущий токен: '${token}'
-Состояние: ${state}
-${expectedAction ? expectedAction : "нет допустимых действий"}`;
+                let newNode;
+                if (rule.nonTerminal.endsWith("'")) {
+                    newNode = children[0];
+                } else {
+                    const nonTerminalName = rule.nonTerminal.slice(1, -1);
+                    newNode = ASTBuilder.buildNode(nonTerminalName, children, rule);
+                }
+                
+                valueStack.push(newNode);
+
+                const prevState = stateStack[stateStack.length - 1];
+                const gotoState = this.goto.get(prevState)?.get(rule.nonTerminal);
+
+                if (gotoState === undefined) {
+                    return `ОШИБКА GOTO: Не удалось найти переход для ${rule.nonTerminal} из состояния ${prevState}`;
+                }
+                stateStack.push(gotoState);
+
+                if (this.debug) {
+                    console.log(`Reduced by ${rule.nonTerminal} -> ${rule.production.join(' ')}, pushed node:`, newNode);
+                }
+            } else if (act.type === "accept") {
+                const finalNode = valueStack[0];
+                if (finalNode instanceof Program) {
+                    return finalNode;
+                }
+                return `ОШИБКА: Разбор завершен, но итоговый узел не является Program. Получено: ${finalNode?.constructor.name}`;
+            } else { // Error
+                const expectedActions = Array.from(this.action.get(state)?.keys() || []).join(', ');
+                return `ОШИБКА СИНТАКСИСА: Неожиданный токен '${currentToken.type}' в позиции ${pos}. Ожидалось: ${expectedActions}`;
             }
         }
     }

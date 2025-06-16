@@ -41,8 +41,6 @@ export function processGrammar(grammarLines: string[]): Grammar {
     // Перенумеруем правила после добавления дополняющего
     grammar.rules.forEach((rule, index) => rule.id = index);
 
-    console.log(grammar.rules);
-
     return grammar;
 }
 

@@ -1,6 +1,10 @@
 import { Grammar, GrammarRule } from "./types";
 import { EPSILON } from "../lexer/constants";
 
+function isEpsilonProduction(production: string[]): boolean {
+    return production.length === 0 || (production.length === 1 && (production[0] === EPSILON || production[0] === 'ε'));
+}
+
 /**
  * Удаляет ε-правила из КС-грамматики
  * @param grammar Исходная грамматика
@@ -14,8 +18,7 @@ export function removeEpsilonRules(grammar: Grammar): Grammar {
         changed = false;
         for (const rule of grammar.rules) {
             if (
-                rule.production.length === 0 ||
-                rule.production.includes(EPSILON) ||
+                isEpsilonProduction(rule.production) ||
                 rule.production.every(sym => epsilonGenerating.has(sym))
             ) {
                 if (!epsilonGenerating.has(rule.nonTerminal)) {
@@ -28,55 +31,52 @@ export function removeEpsilonRules(grammar: Grammar): Grammar {
 
     // 2. Для каждого правила, где встречается ε-порождающий нетерминал, добавить новые правила с опущенными такими нетерминалами
     const newRules: GrammarRule[] = [];
-    let nextId = 0;
+    const ruleStrings = new Set<string>();
+
     for (const rule of grammar.rules) {
-        // Пропускаем явные ε-правила (добавим их позже, если нужно)
-        if (rule.production.length === 0 || rule.production.includes(EPSILON)) continue;
-        // Найти позиции ε-порождающих нетерминалов
-        const positions: number[] = [];
-        rule.production.forEach((sym, idx) => {
-            if (epsilonGenerating.has(sym)) positions.push(idx);
-        });
-        // Сгенерировать все возможные комбинации опускания ε-порождающих нетерминалов
-        const n = positions.length;
-        const variants = new Set<string>();
-        for (let mask = 0; mask < (1 << n); ++mask) {
-            const prod = rule.production.slice();
-            for (let i = 0; i < n; ++i) {
-                if ((mask & (1 << i)) !== 0) {
-                    prod[positions[i]] = null as any;
+        if (isEpsilonProduction(rule.production)) continue;
+
+        const epsilonPositions = rule.production.map((s, i) => epsilonGenerating.has(s) ? i : -1).filter(i => i !== -1);
+        const numEpsilon = epsilonPositions.length;
+
+        for (let i = 0; i < (1 << numEpsilon); i++) {
+            const newProduction = [...rule.production];
+            for (let j = 0; j < numEpsilon; j++) {
+                if ((i & (1 << j)) !== 0) {
+                    newProduction[epsilonPositions[j]] = null as any;
                 }
             }
-            const filtered = prod.filter(x => x !== null);
-            if (filtered.length > 0) variants.add(filtered.join("\0"));
-        }
-        // Добавить все варианты
-        for (const variant of variants) {
-            newRules.push({
-                id: nextId++,
-                nonTerminal: rule.nonTerminal,
-                production: variant.split("\0"),
-            });
+            const finalProduction = newProduction.filter(s => s !== null);
+            const key = `${rule.nonTerminal}->${finalProduction.join(' ')}`;
+            if (!ruleStrings.has(key)) {
+                newRules.push({ id: 0, nonTerminal: rule.nonTerminal, production: finalProduction });
+                ruleStrings.add(key);
+            }
         }
     }
 
     // 3. Если стартовый символ ε-порождающий, добавить S → ε
     if (epsilonGenerating.has(grammar.startSymbol)) {
-        newRules.push({
-            id: nextId++,
-            nonTerminal: grammar.startSymbol,
-            production: [],
-        });
+        const key = `${grammar.startSymbol}->`;
+        if (!ruleStrings.has(key)) {
+            newRules.push({
+                id: 0,
+                nonTerminal: grammar.startSymbol,
+                production: [],
+            });
+            ruleStrings.add(key);
+        }
     }
-
+    
     // 4. Собрать новые терминалы и нетерминалы
     const nonTerminals = new Set(grammar.nonTerminals);
     const terminals = new Set(grammar.terminals);
 
     return {
-        rules: newRules,
+        rules: newRules.map((r, i) => ({...r, id: i})),
         terminals,
         nonTerminals,
         startSymbol: grammar.startSymbol,
     };
 }
+
