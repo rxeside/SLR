@@ -71,7 +71,7 @@ class Param {
 }
 
 class AssignExpr extends ASTNode {
-    constructor(public name: Identifier | ArrayAccess, public value: ASTNode) {
+    constructor(public target: Identifier | ArrayAccess, public value: ASTNode) {
         super();
     }
 

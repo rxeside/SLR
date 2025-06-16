@@ -64,16 +64,12 @@ export class SymbolTable {
         returnType?: string, 
         isFunctionDefined: boolean = false
     ): SymbolEntry | null {
-        // Определяем целевую область видимости
-        const targetScope = isFunction ? this.globalScope : this.currentScope;
-
-        // Проверяем существование символа ТОЛЬКО в целевой области видимости
-        const existingEntry = targetScope.symbols.get(name);
+        // Проверяем существование символа ТОЛЬКО в текущей области видимости
+        const existingEntry = this.currentScope.symbols.get(name);
 
         if (existingEntry) {
             if (existingEntry.isFunction && isFunction) {
                 if (existingEntry.isFunctionDefined && isFunctionDefined) {
-                    console.error(`Error: Function '${name}' already defined in the current scope.`);
                     return null;
                 }
                 existingEntry.isFunctionDefined = existingEntry.isFunctionDefined || isFunctionDefined;
@@ -84,7 +80,6 @@ export class SymbolTable {
                 if (returnType) existingEntry.returnType = returnType;
                 return existingEntry;
             } else {
-                console.error(`Error: Symbol '${name}' already declared in the current scope.`);
                 return null;
             }
         }
@@ -93,7 +88,7 @@ export class SymbolTable {
             name,
             type,
             value,
-            localIndex: this.getNextLocalIndex(targetScope),
+            localIndex: this.getNextLocalIndex(this.currentScope),
             isFunction: isFunction || false,
             paramTypes: isFunction ? (paramTypes || []) : undefined,
             returnType: isFunction ? (returnType || 'void') : undefined,
@@ -101,8 +96,8 @@ export class SymbolTable {
             argCount: isFunction && paramTypes ? paramTypes.length : undefined
         };
 
-        // Добавляем символ ТОЛЬКО в целевую область видимости
-        targetScope.symbols.set(name, entry);
+        // Добавляем символ ТОЛЬКО в текущую область видимости
+        this.currentScope.symbols.set(name, entry);
         return entry;
     }
 
