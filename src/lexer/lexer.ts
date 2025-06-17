@@ -1,5 +1,6 @@
 import { EOF_SYMBOL, TT, tokenSpecifications } from "./constants";
 import { Token } from "./type";
+import { ErrorHandler, ErrorType } from "../error/error";
 
 const keywords = new Set([
     TT.KEYWORD_LET, TT.KEYWORD_CONST, TT.KEYWORD_FUNCTION, TT.KEYWORD_IF, TT.KEYWORD_ELSE,
@@ -12,12 +13,14 @@ export class Lexer {
     private cursor: number = 0;
     private line: number = 1;
     private column: number = 1;
+    private errorHandler?: ErrorHandler;
 
-    public tokenize(input: string): Token[] {
+    public tokenize(input: string, errorHandler?: ErrorHandler): Token[] {
         this.input = input;
         this.cursor = 0;
         this.line = 1;
         this.column = 1;
+        this.errorHandler = errorHandler;
         const tokens: Token[] = [];
 
         while (this.cursor < this.input.length) {
@@ -96,7 +99,7 @@ export class Lexer {
         this.cursor++;
         this.column++;
         
-        console.error(`Неизвестный токен: '${unknownChar}' в строке ${this.line}, колонке ${this.column -1}`);
+        this.errorHandler?.addError(`Неизвестный токен: '${unknownChar}'`, this.line, this.column -1, ErrorType.Lexical);
         return errorToken;
     }
 }

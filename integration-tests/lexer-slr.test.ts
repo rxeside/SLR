@@ -2,32 +2,34 @@ import { Lexer } from "../src/lexer/lexer";
 import { SLRParser } from "../src/slr/slr";
 import { fullGrammar } from "./grammars";
 import { Program } from "../src/ast/entity";
+import { ErrorHandler } from "../src/error/error";
 
 describe("SLR Integration Tests for Full Grammar", () => {
 
     // Helper function for positive tests
     const expectParses = (input: string) => {
+        const errorHandler = new ErrorHandler();
         const lexer = new Lexer();
-        const parser = new SLRParser(fullGrammar);
-        const tokens = lexer.tokenize(input);
+        const parser = new SLRParser(fullGrammar, errorHandler);
+        const tokens = lexer.tokenize(input, errorHandler);
         const result = parser.parse(tokens);
-        if (typeof result === 'string') {
-            console.error(result); // Print error for debugging
+        
+        if (errorHandler.hasErrors()) {
+            errorHandler.printErrors();
         }
+
+        expect(errorHandler.hasErrors()).toBe(false);
         expect(result).toBeInstanceOf(Program);
     };
 
     // Helper function for negative tests
     const expectFails = (input: string) => {
+        const errorHandler = new ErrorHandler();
         const lexer = new Lexer();
-        const parser = new SLRParser(fullGrammar, false);
-        const tokens = lexer.tokenize(input);
-        const result = parser.parse(tokens);
-        if (typeof result !== 'string') {
-            console.log("Parser returned object, expected error string:", result);
-        }
-        expect(typeof result).toBe("string");
-        expect(result).toContain("ОШИБКА");
+        const parser = new SLRParser(fullGrammar, errorHandler);
+        const tokens = lexer.tokenize(input, errorHandler);
+        parser.parse(tokens);
+        expect(errorHandler.hasErrors()).toBe(true);
     };
     
     test("parses variable declaration with type", () => {

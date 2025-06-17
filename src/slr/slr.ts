@@ -4,6 +4,7 @@ import { EOF_SYMBOL } from "../lexer/constants";
 import { Token } from "../lexer/type";
 import { ASTBuilder } from '../ast/builder';
 import { ASTNode, Program } from "../ast/entity";
+import { ErrorHandler, ErrorType } from "../error/error";
 
 // Типы для таблиц
 export type Action = { type: "shift", to: number } | { type: "reduce", rule: number } | { type: "accept" } | { type: "error" };
@@ -218,8 +219,9 @@ export class SLRParser {
     private action: ActionTable;
     private goto: GotoTable;
     private debug: boolean;
+    private errorHandler?: ErrorHandler;
 
-    constructor(grammarLines: string[], debug = false) {
+    constructor(grammarLines: string[], errorHandler?: ErrorHandler, debug = false) {
         this.grammar = processGrammar(grammarLines);
         const { action, goto } = buildSLRTable(this.grammar);
         if (debug) {
@@ -228,9 +230,10 @@ export class SLRParser {
         this.action = action;
         this.goto = goto;
         this.debug = debug;
+        this.errorHandler = errorHandler;
     }
 
-    parse(tokens: Token[]): Program | string {
+    parse(tokens: Token[]): Program | null {
         const stateStack: number[] = [0];
         const valueStack: (Token | ASTNode)[] = [];
 
@@ -278,7 +281,8 @@ export class SLRParser {
                 const gotoState = this.goto.get(prevState)?.get(rule.nonTerminal);
 
                 if (gotoState === undefined) {
-                    return `ОШИБКА GOTO: Не удалось найти переход для ${rule.nonTerminal} из состояния ${prevState}`;
+                    this.errorHandler?.addError(`GOTO error: Could not find transition for ${rule.nonTerminal} from state ${prevState}`, 0, 0, ErrorType.Syntax);
+                    return null;
                 }
                 stateStack.push(gotoState);
 
@@ -290,10 +294,12 @@ export class SLRParser {
                 if (finalNode instanceof Program) {
                     return finalNode;
                 }
-                return `ОШИБКА: Разбор завершен, но итоговый узел не является Program. Получено: ${finalNode?.constructor.name}`;
+                this.errorHandler?.addError(`Accept error: Parsing finished, but the final node is not a Program. Got: ${finalNode?.constructor.name}`, 0, 0, ErrorType.Syntax);
+                return null;
             } else { // Error
                 const expectedActions = Array.from(this.action.get(state)?.keys() || []).join(', ');
-                return `ОШИБКА СИНТАКСИСА: Неожиданный токен '${currentToken.type}' в позиции ${pos}. Ожидалось: ${expectedActions}`;
+                this.errorHandler?.addError(`Syntax error: Unexpected token '${currentToken.type}' at line ${currentToken.line}, column ${currentToken.column}. Expected: ${expectedActions}`, currentToken.line, currentToken.column, ErrorType.Syntax);
+                return null;
             }
         }
     }

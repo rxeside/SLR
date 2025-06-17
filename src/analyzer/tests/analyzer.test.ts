@@ -3,45 +3,48 @@ import { Program } from '../../ast/entity';
 import { Lexer } from '../../lexer/lexer';
 import { SLRParser } from '../../slr/slr';
 import { fullGrammar } from '../../../integration-tests/grammars';
-import { SemanticError } from '../error';
 import { SymbolTable } from '../../symbolTable/symbolTable';
+import { ErrorHandler, CompilerError } from '../../error/error';
 
 describe('SemanticAnalyzer', () => {
-    let analyzer: SemanticAnalyzer;
-    let symbolTable: SymbolTable;
-
-    const createAst = (source: string): Program => {
+    const analyzeWithErrors = (source: string): CompilerError[] => {
+        const errorHandler = new ErrorHandler();
         const lexer = new Lexer();
-        const tokens = lexer.tokenize(source);
-        const parser = new SLRParser(fullGrammar);
+        const tokens = lexer.tokenize(source, errorHandler);
+        
+        const parser = new SLRParser(fullGrammar, errorHandler);
         const ast = parser.parse(tokens);
-        if (!(ast instanceof Program)) {
-            throw new Error(`Parser failed to produce a valid AST: ${ast}`);
+        
+        if (errorHandler.hasErrors() || !ast) {
+            return errorHandler.errors;
         }
-        return ast;
+
+        const symbolTable = new SymbolTable();
+        const analyzer = new SemanticAnalyzer(symbolTable, errorHandler);
+        analyzer.analyze(ast);
+        
+        return errorHandler.errors;
     };
 
-    beforeEach(() => {
-        symbolTable = new SymbolTable();
-        analyzer = new SemanticAnalyzer(symbolTable);
-    });
-
     test('should throw an error for using an undeclared variable', () => {
-        const ast = createAst('let x: num = y;');
-        expect(() => analyzer.analyze(ast)).toThrow(new SemanticError("Symbol 'y' not found"));
+        const errors = analyzeWithErrors('let x: num = y;');
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toContain("Symbol 'y' not found");
     });
 
     test('should successfully analyze a correct variable declaration', () => {
-        const ast = createAst('let x: num = 10;');
-        expect(() => analyzer.analyze(ast)).not.toThrow();
+        const errors = analyzeWithErrors('let x: num = 10;');
+        expect(errors).toHaveLength(0);
     });
 
     test('should throw an error for a variable declared twice', () => {
-        const ast = createAst(`
+        const source = `
             let x: num = 10;
             let x: string = "hello";
-        `);
-        expect(() => analyzer.analyze(ast)).toThrow(new SemanticError("Symbol 'x' already declared in the current scope"));
+        `;
+        const errors = analyzeWithErrors(source);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toContain("Symbol 'x' already declared in the current scope");
     });
 
     // --- Scope Tests ---
@@ -53,8 +56,8 @@ describe('SemanticAnalyzer', () => {
                 let x: string = "hello"; 
             }
         `;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).not.toThrow();
+        const errors = analyzeWithErrors(source);
+        expect(errors).toHaveLength(0);
     });
 
     test('should allow accessing a variable from an outer scope', () => {
@@ -64,8 +67,8 @@ describe('SemanticAnalyzer', () => {
                 let y: num = x;
             }
         `;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).not.toThrow();
+        const errors = analyzeWithErrors(source);
+        expect(errors).toHaveLength(0);
     });
 
     test('should throw an error when accessing a variable outside its scope', () => {
@@ -75,8 +78,9 @@ describe('SemanticAnalyzer', () => {
             }
             let y: num = x;
         `;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).toThrow(new SemanticError("Symbol 'x' not found"));
+        const errors = analyzeWithErrors(source);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toContain("Symbol 'x' not found");
     });
 
     test('should handle function parameters correctly', () => {
@@ -85,8 +89,8 @@ describe('SemanticAnalyzer', () => {
                 let b: num = a; // 'a' should be visible here
             }
         `;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).not.toThrow();
+        const errors = analyzeWithErrors(source);
+        expect(errors).toHaveLength(0);
     });
 
     test('should throw error when accessing function parameter outside the function', () => {
@@ -96,16 +100,18 @@ describe('SemanticAnalyzer', () => {
             }
             let c: num = a; // 'a' should not be visible here
         `;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).toThrow(new SemanticError("Symbol 'a' not found"));
+        const errors = analyzeWithErrors(source);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toContain("Symbol 'a' not found");
     });
 
     // --- Type Checking Tests ---
 
     test('should throw an error for type mismatch in variable declaration', () => {
         const source = `let x: num = "hello";`;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).toThrow(new SemanticError("Type mismatch: cannot assign 'string' to 'num'"));
+        const errors = analyzeWithErrors(source);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toContain("Type mismatch: cannot assign 'string' to 'num'");
     });
 
     test('should throw an error for type mismatch in assignment', () => {
@@ -113,14 +119,16 @@ describe('SemanticAnalyzer', () => {
             let x: num = 10;
             x = "world";
         `;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).toThrow(new SemanticError("Type mismatch: cannot assign 'string' to 'num'"));
+        const errors = analyzeWithErrors(source);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toContain("Type mismatch: cannot assign 'string' to 'num'");
     });
 
     test('should throw an error for invalid types in binary expression', () => {
         const source = `let x: num = 10 + "hello";`;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).toThrow(new SemanticError("Operator '+' cannot be applied to types 'num' and 'string'"));
+        const errors = analyzeWithErrors(source);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toContain("Operator '+' cannot be applied to types 'num' and 'string'");
     });
 
     test('should throw an error for incorrect return type', () => {
@@ -129,16 +137,18 @@ describe('SemanticAnalyzer', () => {
                 return "not-a-number";
             }
         `;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).toThrow(new SemanticError("Type mismatch: cannot return 'string' from a function expecting 'num'"));
+        const errors = analyzeWithErrors(source);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toContain("Type mismatch: cannot return 'string' from a function expecting 'num'");
     });
 
     // --- Function Call Tests ---
 
     test('should throw an error for calling an undeclared function', () => {
         const source = `nonExistentFunc();`;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).toThrow(new SemanticError("Function 'nonExistentFunc' not found or not a function"));
+        const errors = analyzeWithErrors(source);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toContain("Function 'nonExistentFunc' not found or not a function");
     });
 
     test('should throw an error for calling a variable that is not a function', () => {
@@ -146,8 +156,9 @@ describe('SemanticAnalyzer', () => {
             let x: num = 10;
             x();
         `;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).toThrow(new SemanticError("Function 'x' not found or not a function"));
+        const errors = analyzeWithErrors(source);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toContain("Function 'x' not found or not a function");
     });
 
     test('should throw an error for calling a function with incorrect number of arguments', () => {
@@ -155,8 +166,9 @@ describe('SemanticAnalyzer', () => {
             function myFunc(a: num, b: string): void {}
             myFunc(1);
         `;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).toThrow(new SemanticError("Function 'myFunc' expects 2 arguments, but received 1"));
+        const errors = analyzeWithErrors(source);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toContain("Function 'myFunc' expects 2 arguments, but received 1");
     });
 
     test('should throw an error for calling a function with incorrect argument types', () => {
@@ -164,8 +176,9 @@ describe('SemanticAnalyzer', () => {
             function myFunc(a: num, b: string): void {}
             myFunc(1, 2);
         `;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).toThrow(new SemanticError("Type mismatch: Argument 2 for function 'myFunc' expects 'string', but received 'num'"));
+        const errors = analyzeWithErrors(source);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toContain("Type mismatch: Argument 2 for function 'myFunc' expects 'string', but received 'num'");
     });
 
     // --- Control Flow Tests ---
@@ -174,24 +187,26 @@ describe('SemanticAnalyzer', () => {
         const source = `
             if (1) {}
         `;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).toThrow(new SemanticError("If statement condition must be a boolean, but got 'num'"));
+        const errors = analyzeWithErrors(source);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toContain("If statement condition must be a boolean, but got 'num'");
     });
 
     test('should throw an error if condition in while-statement is not a boolean', () => {
         const source = `
             while ("hello") {}
         `;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).toThrow(new SemanticError("While statement condition must be a boolean, but got 'string'"));
+        const errors = analyzeWithErrors(source);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toContain("While statement condition must be a boolean, but got 'string'");
     });
 
     // --- Array Tests ---
 
     test('should correctly analyze an array declaration', () => {
         const source = `let arr: num[] = [1, 2, 3];`;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).not.toThrow();
+        const errors = analyzeWithErrors(source);
+        expect(errors).toHaveLength(0);
     });
 
     test('should throw an error when indexing a non-array variable', () => {
@@ -199,8 +214,9 @@ describe('SemanticAnalyzer', () => {
             let x: num = 10;
             let y: num = x[0];
         `;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).toThrow(new SemanticError("Cannot access index of non-array type 'num'"));
+        const errors = analyzeWithErrors(source);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toContain("Cannot access index of non-array type 'num'");
     });
 
     test('should throw an error for non-numeric array index', () => {
@@ -208,7 +224,8 @@ describe('SemanticAnalyzer', () => {
             let arr: num[] = [1, 2];
             let y: num = arr["hello"];
         `;
-        const ast = createAst(source);
-        expect(() => analyzer.analyze(ast)).toThrow(new SemanticError("Array index must be of type 'num', but got 'string'"));
+        const errors = analyzeWithErrors(source);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toContain("Array index must be of type 'num', but got 'string'");
     });
 }); 

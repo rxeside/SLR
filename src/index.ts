@@ -7,23 +7,36 @@ import { CodeGenerator } from './generator/generator';
 import { SemanticAnalyzer } from './analyzer/analyzer';
 import { SymbolTable } from './symbolTable/symbolTable';
 import * as vm from 'vm';
+import { ErrorHandler } from './error/error';
 
 function compileAndRun(sourceCode: string): void {
+    const errorHandler = new ErrorHandler();
+    errorHandler.setSourceCode(sourceCode);
+
     // 1. Lexer
     const lexer = new Lexer();
-    const tokens = lexer.tokenize(sourceCode);
+    const tokens = lexer.tokenize(sourceCode, errorHandler);
 
     // 2. Parser
-    const parser = new SLRParser(fullGrammar);
+    const parser = new SLRParser(fullGrammar, errorHandler);
     const ast = parser.parse(tokens);
-    if (!(ast instanceof Program)) {
-        throw new Error('Failed to parse the source code into a valid AST.');
+
+    if (errorHandler.hasErrors() || !ast) {
+        errorHandler.printErrors();
+        console.log('Compilation failed.');
+        return;
     }
 
     // 3. Semantic Analyzer
     const symbolTable = new SymbolTable();
-    const analyzer = new SemanticAnalyzer(symbolTable);
+    const analyzer = new SemanticAnalyzer(symbolTable, errorHandler);
     analyzer.analyze(ast);
+
+    if (errorHandler.hasErrors()) {
+        errorHandler.printErrors();
+        console.log('Compilation failed.');
+        return;
+    }
 
     // 4. Code Generator
     const generator = new CodeGenerator();
