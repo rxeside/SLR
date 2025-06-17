@@ -1,5 +1,6 @@
 {
     "scripts": {
+        "build": "tsc",
         "slr": "npx tsx src/main.ts",
         "test": "jest",
         "test:ast": "jest integration-tests/ast/builder.test.ts",

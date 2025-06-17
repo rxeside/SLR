@@ -1,53 +1,58 @@
-export interface SymbolEntry {
-    name: string;           
-    type: string;           
-    value?: any;           
-    localIndex: number;    
-    address?: number;      
-    
-    isFunction?: boolean;       
-    paramTypes?: string[];      
-    returnType?: string;        
-    isFunctionDefined?: boolean;
-    argCount?: number;         
-}
-
-interface Scope {
+export interface Scope {
     name: string;
     symbols: Map<string, SymbolEntry>;
     parent: Scope | null;
     children: Scope[];
+    nextLocalIndex: number;
 }
 
+export interface SymbolEntry {
+    name: string;
+    type: string;
+    value?: any;
+    localIndex?: number;
+
+    isFunction?: boolean;
+    paramTypes?: string[];
+    returnType?: string;
+    // isFunctionDefined?: boolean; // Определяется по наличию functionBodyScope
+    argCount?: number;
+
+    definedInScope: Scope;     // Область, где СИМВОЛ (имя функции/переменной) определен
+    functionBodyScope?: Scope; // Область видимости ТЕЛА функции (для символов типа 'function')
+                               // Здесь будут храниться параметры и локальные переменные функции
+}
+
+
 export class SymbolTable {
-    private currentScope: Scope;
-    private globalScope: Scope;
+    public currentScope: Scope;
+    public globalScope: Scope;
 
     constructor() {
         this.globalScope = {
             name: "GLOBAL",
             symbols: new Map<string, SymbolEntry>(),
             parent: null,
-            children: []
+            children: [],
+            nextLocalIndex: 0
         };
         this.currentScope = this.globalScope;
     }
 
-    enterScope(name: string = "anonymous"): void {
+    enterScope(name: string = "anonymous_scope"): Scope { // enterScope теперь возвращает созданную область
         const newScope: Scope = {
             name,
             symbols: new Map<string, SymbolEntry>(),
             parent: this.currentScope,
-            children: []
+            children: [],
+            nextLocalIndex: 0 // Каждая новая область (особенно для функций) начинает отсчет локальных с 0
         };
         this.currentScope.children.push(newScope);
         this.currentScope = newScope;
+        return newScope; // Возвращаем для возможного сохранения
     }
 
     exitScope(): boolean {
-        if (this.currentScope === this.globalScope) {
-            return false;
-        }
         if (this.currentScope.parent) {
             this.currentScope = this.currentScope.parent;
             return true;
@@ -56,94 +61,68 @@ export class SymbolTable {
     }
 
     add(
-        name: string, 
-        type: string, 
-        value?: any, 
-        isFunction: boolean = false, 
-        paramTypes?: string[], 
-        returnType?: string, 
-        isFunctionDefined: boolean = false
+        name: string,
+        type: string,
+        value?: any,
+        isFunction: boolean = false,
+        paramTypes?: string[],
+        returnType?: string,
+        // isFunctionDefined: boolean = false // Убрано, определяется через functionBodyScope
     ): SymbolEntry | null {
-        // Проверяем существование символа ТОЛЬКО в текущей области видимости
-        const existingEntry = this.currentScope.symbols.get(name);
-
-        if (existingEntry) {
-            if (existingEntry.isFunction && isFunction) {
-                if (existingEntry.isFunctionDefined && isFunctionDefined) {
-                    return null;
-                }
-                existingEntry.isFunctionDefined = existingEntry.isFunctionDefined || isFunctionDefined;
-                if (paramTypes) {
-                    existingEntry.paramTypes = paramTypes;
-                    existingEntry.argCount = paramTypes.length;
-                }
-                if (returnType) existingEntry.returnType = returnType;
-                return existingEntry;
-            } else {
-                return null;
-            }
+        if (this.currentScope.symbols.has(name)) {
+            // Простая проверка на повторное объявление в той же области
+            // Для функций можно добавить логику перегрузки или обновления объявлений vs определений
+            return null;
         }
+
+        let localIdx: number | undefined = undefined;
+        // localIndex присваивается только для переменных/параметров, не для имен функций в глобальной области
+        // и только если текущая область не глобальная (для параметров и локальных переменных функций)
+        if (!isFunction && this.currentScope !== this.globalScope) {
+            localIdx = this.currentScope.nextLocalIndex++;
+        } else if (isFunction && this.currentScope === this.globalScope) {
+            // Глобальные функции не имеют localIndex в смысле слотов на стеке ВМ для аргументов,
+            // но их символы хранятся в globalScope.
+        }
+
 
         const entry: SymbolEntry = {
             name,
             type,
-            value,
-            localIndex: this.getNextLocalIndex(this.currentScope),
-            isFunction: isFunction || false,
+            // value, // Обычно не используется для переменных/функций на этом этапе
+            localIndex: localIdx,
+            isFunction: isFunction,
             paramTypes: isFunction ? (paramTypes || []) : undefined,
             returnType: isFunction ? (returnType || 'void') : undefined,
-            isFunctionDefined: isFunction ? (isFunctionDefined || false) : undefined,
-            argCount: isFunction && paramTypes ? paramTypes.length : undefined
+            argCount: isFunction && paramTypes ? paramTypes.length : undefined,
+            definedInScope: this.currentScope,
+            functionBodyScope: undefined // Будет установлено для функций в SemanticAnalyzer
         };
 
-        // Добавляем символ ТОЛЬКО в текущую область видимости
         this.currentScope.symbols.set(name, entry);
         return entry;
     }
 
-    lookupGlobal(name: string): SymbolEntry | undefined {
-        // Ищем ТОЛЬКО в глобальной области видимости
-        return this.globalScope.symbols.get(name);
-    }
-
     lookup(name: string): SymbolEntry | undefined {
-        // Сначала ищем в текущей области видимости
-        const entry = this.currentScope.symbols.get(name);
-        if (entry) {
-            return entry;
-        }
-
-        // Если не нашли и есть родительская область, ищем рекурсивно вверх по цепочке
-        let scope = this.currentScope.parent;
+        let scope: Scope | null = this.currentScope;
         while (scope) {
-            const parentEntry = scope.symbols.get(name);
-            if (parentEntry) {
-                return parentEntry;
+            const entry = scope.symbols.get(name);
+            if (entry) {
+                return entry;
             }
             scope = scope.parent;
         }
-
         return undefined;
     }
 
     lookupCurrentScope(name: string): SymbolEntry | undefined {
-        // Ищем ТОЛЬКО в текущей области видимости
         return this.currentScope.symbols.get(name);
-    }
-
-    private getNextLocalIndex(scope: Scope): number {
-        let maxIndex = -1;
-        for (const entry of scope.symbols.values()) {
-            if (!entry.isFunction && entry.localIndex !== undefined) {
-                maxIndex = Math.max(maxIndex, entry.localIndex);
-            }
-        }
-        return maxIndex + 1;
     }
 
     clear(): void {
         this.globalScope.symbols.clear();
         this.globalScope.children = [];
+        this.globalScope.nextLocalIndex = 0;
         this.currentScope = this.globalScope;
     }
 
@@ -155,36 +134,25 @@ export class SymbolTable {
 
     private printScope(scope: Scope, depth: number): void {
         const indent = "  ".repeat(depth);
-        console.log(`${indent}=== ${scope.name} ===`);
-        
+        console.log(`${indent}=== Scope: ${scope.name} (Parent: ${scope.parent ? scope.parent.name : 'null'}, NextLocalIdx: ${scope.nextLocalIndex}) ===`);
+
         if (scope.symbols.size === 0) {
             console.log(`${indent}(empty)`);
         } else {
-            scope.symbols.forEach((entry, name) => {
-                let entryString = `${indent}'${name}' -> { type: '${entry.type}', index: ${entry.localIndex}`;
-                
-                if (entry.value !== undefined) {
-                    entryString += `, value: ${entry.value}`;
-                }
-                
+            scope.symbols.forEach((entry) => {
+                let entryString = `${indent}'${entry.name}' -> { type: '${entry.type}'`;
+                if (entry.localIndex !== undefined) entryString += `, localIndex: ${entry.localIndex}`;
+                entryString += `, definedInScope: ${entry.definedInScope.name}`;
                 if (entry.isFunction) {
-                    entryString += `, returnType: ${entry.returnType || 'void'}`;
-                    entryString += `, params: [${entry.paramTypes ? entry.paramTypes.join(', ') : ''}]`;
-                    entryString += `, argCount: ${entry.argCount}`;
-                    if (entry.address !== undefined) {
-                        entryString += `, address: ${entry.address}`;
-                    }
-                    entryString += `, defined: ${entry.isFunctionDefined}`;
+                    entryString += `, isFunction: true, return: ${entry.returnType}, params: [${entry.paramTypes?.join(', ')}]`;
+                    if (entry.functionBodyScope) entryString += `, funcBodyScopeName: ${entry.functionBodyScope.name}`;
                 }
-                
                 entryString += ` }`;
                 console.log(entryString);
             });
         }
-
-        // Recursively print child scopes
         for (const child of scope.children) {
             this.printScope(child, depth + 1);
         }
     }
-} 
+}

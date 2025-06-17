@@ -1,17 +1,29 @@
+// jest.config.js
 module.exports = {
     preset: 'ts-jest',
     testEnvironment: 'node',
-    testMatch: ['**/tests/**/*.test.ts', '**/integration-tests/**/*.test.ts'],
+    testMatch: [
+        '**/tests/**/*.test.ts',
+        '**/integration-tests/**/*.test.ts',
+        '**/src/**/*.test.ts',
+    ],
     moduleNameMapper: {
-        '^@common/(.*)$': '<rootDir>/common/$1',
         '^@src/(.*)$': '<rootDir>/src/$1',
-        '^@integration-tests/(.*)$': '<rootDir>/integration-tests/$1'
+
     },
-    modulePaths: ['<rootDir>'],
-    coverageDirectory: '../coverage',
-    moduleFileExtensions: ['js', 'json', 'ts'],
+    coverageDirectory: './coverage',
+    moduleFileExtensions: ['js', 'json', 'ts', 'tsx'],
     transform: {
-        '^.+\\.tsx?$': 'ts-jest'
+        '^.+\\.(ts|tsx)$': 'ts-jest'
     },
-    collectCoverageFrom: ['**/*.(t|j)s'],
+    collectCoverageFrom: [
+        'src/**/*.{ts,js}',
+        '!src/**/*.test.{ts,js}',
+        '!src/**/index.{ts,js}'
+    ],
+    roots: [
+        "<rootDir>/src",
+        "<rootDir>/tests",
+        "<rootDir>/integration-tests"
+    ]
 };
