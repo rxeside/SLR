@@ -1,0 +1,12 @@
+const a: string = "Hello";
+const b: string = "World";
+const c: number = 3;
+
+if (c == 4)
+{
+    println(a + b);
+}
+else
+{
+    println(a + b + c);
+}

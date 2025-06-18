@@ -1,0 +1,23 @@
+const a: array = [123, 2, 19];
+
+function bubbleSort(arr: array): array
+{
+    const size: number = arrayLength(arr);
+
+    for (var i: number = 0; i < size; i++)
+    {
+        for (var j: number = 0; j < size - i - 1; j++)
+        {
+            if (arr[j] > arr[j + 1])
+            {
+                var temp: number = arr[j];
+                arr[j] = arr[j + 1];
+                arr[j + 1] = temp;
+            }
+        }
+    }
+
+    return arr;
+}
+
+println(bubbleSort(a));

@@ -1,0 +1,133 @@
+.def
+.argc 0
+.locals 4
+.name __EntryPoint__
+
+.constants
+number 10
+number 100
+number 1
+string "println"
+
+.code
+29 load_fn 1
+29 set_local 0
+29 const 0
+29 set_local 1
+30 const 1
+30 set_local 2
+32 get_local 1
+32 set_local 3
+
+forcond2:
+32 get_local 3
+32 get_local 2
+32 const 2
+32 add
+32 clt
+39 jmp_false forend2
+39 jmp forblock2
+
+foraction2:
+32 get_local 3
+32 const 2
+32 add
+32 set_local 3
+32 get_local 3
+32 pop
+39 jmp forcond2
+
+forblock2:
+34 get_local 3
+34 get_local 0
+34 call
+38 jmp_false endif5
+36 get_local 3
+36 get_global 3
+36 call
+36 pop
+
+endif5:
+39 jmp foraction2
+
+forend2:
+39 return
+
+.def
+.argc 1
+.locals 1
+.name isPrime
+
+.constants
+number 2
+number 0
+number 3
+string "sqrt"
+number 1
+
+.code
+3 get_local 0
+3 const 0
+3 clt
+8 jmp_false endif1
+5 false
+5 return
+
+endif1:
+8 get_local 0
+8 const 0
+8 ceq
+13 jmp_false endif2
+10 true
+10 return
+
+endif2:
+13 get_local 0
+13 const 0
+13 mod
+13 const 1
+13 ceq
+18 jmp_false endif3
+15 false
+15 return
+
+endif3:
+18 const 2
+18 set_local 1
+
+forcond1:
+18 get_local 1
+18 get_local 0
+18 get_global 3
+18 call
+18 const 4
+18 add
+18 clt
+26 jmp_false forend1
+26 jmp forblock1
+
+foraction1:
+18 get_local 1
+18 const 0
+18 add
+18 set_local 1
+18 get_local 1
+18 pop
+26 jmp forcond1
+
+forblock1:
+20 get_local 0
+20 get_local 1
+20 mod
+20 const 1
+20 ceq
+24 jmp_false endif4
+22 false
+22 return
+
+endif4:
+26 jmp foraction1
+
+forend1:
+26 true
+26 return

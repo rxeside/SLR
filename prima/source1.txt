@@ -1,0 +1,7 @@
+print("Hello World");
+
+println("Hello World");
+
+println(getTimestamp());
+
+println(sqrt(2));

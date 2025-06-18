@@ -1,0 +1,7 @@
+const a: number = 1;
+
+if (a)
+{
+  a;
+}
+

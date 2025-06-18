@@ -1,0 +1,21 @@
+.def
+.argc 0
+.locals 0
+.name __EntryPoint__
+
+.constants
+number 5
+number 2
+number 20
+
+.code
+1 const 0
+1 const 1
+1 mul
+1 neg
+1 const 2
+1 add
+1 const 1
+1 div
+1 pop
+3 return
