@@ -272,6 +272,8 @@ export class SLRParser {
                     newNode = children[0];
                 } else {
                     const nonTerminalName = rule.nonTerminal.slice(1, -1);
+                    console.log(`[PARSER] Reducing by rule: ${rule.nonTerminal} -> ${rule.production.join(' ')}`);
+                    console.log(`[PARSER] Children for ASTBuilder (${nonTerminalName}):`, children.map(c => ({ type: (c as any).type, constructorName: c?.constructor?.name, value: (c as Token)?.value }) ));
                     newNode = ASTBuilder.buildNode(nonTerminalName, children, rule);
                 }
                 

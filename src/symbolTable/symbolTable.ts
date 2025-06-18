@@ -3,8 +3,11 @@ export interface Scope {
     symbols: Map<string, SymbolEntry>;
     parent: Scope | null;
     children: Scope[];
-    nextLocalIndex: number;
+    //nextLocalIndex: number;
+    _debug_id?: number; // Для отладки
 }
+let scopeIdCounter = 0;
+
 
 export interface SymbolEntry {
     name: string;
@@ -27,6 +30,7 @@ export interface SymbolEntry {
 export class SymbolTable {
     public currentScope: Scope;
     public globalScope: Scope;
+    private functionLocalIndexCounter: number = 0; // Счетчик для текущей функции
 
     constructor() {
         this.globalScope = {
@@ -34,10 +38,20 @@ export class SymbolTable {
             symbols: new Map<string, SymbolEntry>(),
             parent: null,
             children: [],
-            nextLocalIndex: 0
+            //nextLocalIndex: 0
         };
         this.currentScope = this.globalScope;
     }
+
+    public beginFunctionScope(): void {
+        this.functionLocalIndexCounter = 0;
+    }
+
+    // Вызывается SemanticAnalyzer'ом для получения следующего индекса для параметра или локальной переменной
+    public getNextFunctionLocalIndex(): number {
+        return this.functionLocalIndexCounter++;
+    }
+
 
     enterScope(name: string = "anonymous_scope"): Scope { // enterScope теперь возвращает созданную область
         const newScope: Scope = {
@@ -45,7 +59,9 @@ export class SymbolTable {
             symbols: new Map<string, SymbolEntry>(),
             parent: this.currentScope,
             children: [],
-            nextLocalIndex: 0 // Каждая новая область (особенно для функций) начинает отсчет локальных с 0
+            //nextLocalIndex: 0, // Каждая новая область (особенно для функций) начинает отсчет локальных с 0
+            _debug_id: scopeIdCounter++ // <--- ДОБАВИТЬ
+
         };
         this.currentScope.children.push(newScope);
         this.currentScope = newScope;
@@ -75,22 +91,12 @@ export class SymbolTable {
             return null;
         }
 
-        let localIdx: number | undefined = undefined;
-        // localIndex присваивается только для переменных/параметров, не для имен функций в глобальной области
-        // и только если текущая область не глобальная (для параметров и локальных переменных функций)
-        if (!isFunction && this.currentScope !== this.globalScope) {
-            localIdx = this.currentScope.nextLocalIndex++;
-        } else if (isFunction && this.currentScope === this.globalScope) {
-            // Глобальные функции не имеют localIndex в смысле слотов на стеке ВМ для аргументов,
-            // но их символы хранятся в globalScope.
-        }
-
 
         const entry: SymbolEntry = {
             name,
             type,
             // value, // Обычно не используется для переменных/функций на этом этапе
-            localIndex: localIdx,
+            localIndex: undefined,
             isFunction: isFunction,
             paramTypes: isFunction ? (paramTypes || []) : undefined,
             returnType: isFunction ? (returnType || 'void') : undefined,
@@ -122,7 +128,7 @@ export class SymbolTable {
     clear(): void {
         this.globalScope.symbols.clear();
         this.globalScope.children = [];
-        this.globalScope.nextLocalIndex = 0;
+        //this.globalScope.nextLocalIndex = 0;
         this.currentScope = this.globalScope;
     }
 
@@ -134,8 +140,7 @@ export class SymbolTable {
 
     private printScope(scope: Scope, depth: number): void {
         const indent = "  ".repeat(depth);
-        console.log(`${indent}=== Scope: ${scope.name} (Parent: ${scope.parent ? scope.parent.name : 'null'}, NextLocalIdx: ${scope.nextLocalIndex}) ===`);
-
+        console.log(`${indent}=== Scope: ${scope.name} (Parent: ${scope.parent ? scope.parent.name : 'null'}) ===`);
         if (scope.symbols.size === 0) {
             console.log(`${indent}(empty)`);
         } else {

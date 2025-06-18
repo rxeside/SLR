@@ -1,34 +1,17 @@
 import {
-    ASTNode,
-    Program,
-    Block,
-    VarDecl,
-    FuncDecl,
-    Param,
-    AssignExpr,
-    BinaryExpr,
-    UnaryExpr,
-    CallExpr,
-    Literal,
-    Identifier,
-    IfStmt,
-    WhileStmt,
-    ReturnStmt,
-    ArrayLiteral,
-    ArrayAccess,
-    ParamList,
-    ArgList,
-} from './entity'
-import {GrammarRule} from '../grammar/types';
-import {TT} from '../lexer/constants';
-import {Token} from '../lexer/type';
+    ASTNode, Program, Block, VarDecl, FuncDecl, Param, AssignExpr, BinaryExpr, UnaryExpr,
+    CallExpr, Literal, Identifier, IfStmt, WhileStmt, ReturnStmt, ArrayLiteral,
+    ArrayAccess, ParamList, ArgList
+} from './entity';
+import { GrammarRule } from '../grammar/types';
+import { TT } from '../lexer/constants';
+import { Token } from '../lexer/type';
 
 export interface Position {
     line: number;
     column: number;
 }
 
-// Вспомогательная функция для проверки, является ли объект токеном
 function isToken(obj: any): obj is Token {
     return obj && typeof obj === 'object' && 'type' in obj;
 }
@@ -45,7 +28,6 @@ function getFirstPosition(children: (ASTNode | Token)[]): Position {
     return DUMMY_POS;
 }
 
-// Константа для позиции по умолчанию
 const DUMMY_POS: Position = { line: 0, column: 0 };
 
 class ASTBuilder {
@@ -55,7 +37,6 @@ class ASTBuilder {
             arr.reduce((acc, val) => Array.isArray(val) ? acc.concat(flatten(val)) : acc.concat(val), []);
 
         switch (actionName) {
-            // Meta rules
             case 'Program': {
                 const statements = children.flatMap(s => s instanceof Program ? s.statements : (s instanceof ASTNode ? [s] : []));
                 return new Program(statements, pos.line, pos.column);
@@ -73,7 +54,6 @@ class ASTBuilder {
                 return new Block(statements, pos.line, pos.column);
             }
 
-            // Pass-through rules that just select the real node
             case 'Statement':
             case 'Expression':
             case 'ArrayIndex':
@@ -93,39 +73,56 @@ class ASTBuilder {
                 return new BinaryExpr(left as ASTNode, (op as Token).value, right as ASTNode, pos.line, pos.column);
             }
 
-            // Statement Rules
             case 'BaseDeclaration':
-            case 'Declaration': { // let id : <Type> = <Expression> ;
+            case 'Declaration': {
                 const nameToken = children[1] as Token;
-                const typeNode = children[3] as Identifier; // This should be the result of the <Type> rule
+                const typeNode = children[3] as Identifier;
                 const initializerNode = children[5] as ASTNode;
-
                 const varName = nameToken.value;
-                const varType = typeNode.name; // <Type> becomes an Identifier with the type name
-
+                const varType = typeNode.name;
                 return new VarDecl(varName, varType, initializerNode, pos.line, pos.column);
             }
-            case 'ReturnStatement': { // return <Expression> ;
+            case 'ReturnStatement': {
                 return new ReturnStmt(children[1] as ASTNode, pos.line, pos.column);
             }
-            case 'Assignment': { // id = <Expression> ; or <ArrayAccess> = <Expression> ;
+            case 'Assignment': {
                 const left = children[0];
                 const value = children[2] as ASTNode;
 
                 if (left instanceof Identifier || left instanceof ArrayAccess) {
                     return new AssignExpr(left, value, pos.line, pos.column);
                 }
-
                 if (isToken(left) && left.type === 'id') {
                     return new AssignExpr(new Identifier(left.value, left.line, left.column), value, pos.line, pos.column);
                 }
-
                 throw new Error(`Invalid assignment target: ${JSON.stringify(left)}`);
             }
-            case 'IfStatement': {
+            case "IfStatement": {
+                console.log("[ASTBuilder] Reducing IfStatement. Rule RHS:", rule.production.join(' '));
+                console.log("[ASTBuilder] Children for IfStatement:", children.map(c => ({ type: (c as any).type, constructorName: c?.constructor?.name, value: (c as Token)?.value }) ));
+
                 const condition = children[2] as ASTNode;
                 const thenBranch = children[5] as Block;
-                const elseBranch = children.length > 7 ? (children[9] as Block) : undefined;
+
+                if (!(thenBranch instanceof Block)) {
+                    console.error("[ASTBuilder] CRITICAL: thenBranch is NOT a Block!", thenBranch);
+                }
+
+                let elseBranch: Block | undefined = undefined;
+                if (rule.production.join(' ') === 'if ( <Expression> ) { <Block> } else { <Block> }') {
+                    if (children.length >= 10) {
+                        const potentialElseBlock = children[9];
+                        console.log("[ASTBuilder] Potential elseBranch raw child[9]:", potentialElseBlock);
+                        if (potentialElseBlock instanceof Block) {
+                            elseBranch = potentialElseBlock;
+                        } else {
+                            console.error("[ASTBuilder] CRITICAL: children[9] for elseBranch is NOT a Block! It is:", potentialElseBlock?.constructor?.name, potentialElseBlock);
+                        }
+                    } else {
+                        console.error("[ASTBuilder] CRITICAL: Not enough children for IfStmt with else rule. Expected 11, got:", children.length);
+                    }
+                }
+
                 return new IfStmt(condition, thenBranch, [], elseBranch, pos.line, pos.column);
             }
             case 'WhileStatement': {
@@ -133,7 +130,7 @@ class ASTBuilder {
                 const body = children[5] as Block;
                 return new WhileStmt(condition, body, pos.line, pos.column);
             }
-            case 'FunctionCall': { // id ( <Args> ) ;
+            case 'FunctionCall': {
                 const nameToken = children[0] as Token;
                 const argsNode = children[2] as ArgList | undefined;
                 const args = argsNode ? argsNode.args : [];
@@ -142,26 +139,21 @@ class ASTBuilder {
             }
             case 'FunctionDeclaration': {
                 const nameToken = children[1] as Token;
-
                 let paramList: Param[];
                 let returnTypeIdentifier: Identifier;
                 let body: Block;
 
                 if (children[3] instanceof ParamList) {
-                    // Has params
                     paramList = (children[3] as ParamList).params;
                     returnTypeIdentifier = children[6] as Identifier;
                     body = children[8] as Block;
                 } else {
-                    // No params
                     paramList = [];
                     returnTypeIdentifier = children[5] as Identifier;
                     body = children[7] as Block;
                 }
-
                 const funcName = nameToken.value;
                 const returnType = returnTypeIdentifier.name;
-
                 return new FuncDecl(funcName, paramList, returnType, body, pos.line, pos.column);
             }
             case 'Params': {
@@ -192,19 +184,14 @@ class ASTBuilder {
                 const otherArgs = children.length > 2 && children[2] instanceof ArgList ? (children[2] as ArgList).args : [];
                 return new ArgList([firstArg, ...otherArgs], pos.line, pos.column);
             }
-
-            // Expression Rules
             case 'Factor': {
                 const first = children[0];
-
-                if (first instanceof ASTNode) { // Rule: <Factor> -> <ArrayAccess>
+                if (first instanceof ASTNode) {
                     return first;
                 }
-
                 if (isToken(first)) {
                     switch (first.type) {
                         case TT.IDENTIFIER:
-                            // Rule: <Factor> -> id or <Factor> -> id ( <Args> )
                             if (children.length > 1 && isToken(children[1]) && children[1].type === TT.PUNCT_LPAREN) {
                                 const callee = first.value;
                                 const argsNode = children[2] as ArgList | undefined;
@@ -212,20 +199,14 @@ class ASTBuilder {
                                 return new CallExpr(callee, args, first.line, first.column);
                             }
                             return new Identifier(first.value, first.line, first.column);
-
                         case TT.PUNCT_LPAREN:
-                            // Rule: <Factor> -> ( <Expression> )
                             return children[1] as ASTNode;
-
                         case TT.PUNCT_MINUS:
-                            // Rule: <Factor> -> - <Factor>
                             return new UnaryExpr('-', children[1] as ASTNode, first.line, first.column);
-
                         case TT.NUMBER:
                         case TT.STRING:
                         case TT.KEYWORD_TRUE:
                         case TT.KEYWORD_FALSE: {
-                            // Rule: <Factor> -> literal
                             let value: any = first.value;
                             if (first.type === TT.NUMBER) value = Number(value);
                             else if (first.type === TT.KEYWORD_TRUE) value = true;
@@ -233,21 +214,18 @@ class ASTBuilder {
                             else if (first.type === TT.STRING) value = value.slice(1, -1);
                             return new Literal(value, first.line, first.column);
                         }
-                        case TT.PUNCT_LBRACKET: // '['
+                        case TT.PUNCT_LBRACKET:
                             console.log('Factor -> [');
-                            return new ArrayLiteral([], pos.line, pos.column); // Placeholder for now
+                            return new ArrayLiteral([], pos.line, pos.column);
                     }
                 }
 
                 if (children[0] instanceof ArrayLiteral) {
                     return children[0];
                 }
-
                 console.log('Unhandled Factor:', JSON.stringify(children, null, 2));
                 throw new Error(`Unhandled Factor: ${JSON.stringify(children)}`);
             }
-
-            // Type Rules
             case 'Type':
                 return children[0] as ASTNode;
             case 'BaseType':
@@ -257,35 +235,29 @@ class ASTBuilder {
                 const baseType = (children[0] as Identifier).name;
                 const arrayToken = children[1] as Token;
                 return new Identifier(`${baseType}[]`, arrayToken.line, arrayToken.column);
-
-            // Literal / Identifier from Token
-            case 'Literal': // A generic case for building literals from single tokens
+            case 'Literal':
                 const token = children[0] as Token;
                 if (token.type === TT.IDENTIFIER) return new Identifier(token.value, token.line, token.column);
-
                 let value: any;
                 switch (token.type) {
                     case TT.NUMBER: value = Number(token.value); break;
-                    case TT.STRING: value = token.value.slice(1, -1); break; // remove quotes
+                    case TT.STRING: value = token.value.slice(1, -1); break;
                     case TT.KEYWORD_TRUE: value = true; break;
                     case TT.KEYWORD_FALSE: value = false; break;
                     default: value = token.value;
                 }
                 return new Literal(value, token.line, token.column);
-
-            // Array Rules
             case 'ArrayLiteral': {
-                if (children.length === 2) { // Empty array: [ ]
+                if (children.length === 2) {
                     return new ArrayLiteral([], pos.line, pos.column);
                 }
-                // Has elements: [ <ArrayElements> ]
-                const elementsNode = children[1] as ArgList; // Re-use ArgList logic
+                const elementsNode = children[1] as ArgList;
                 return new ArrayLiteral(elementsNode.args, pos.line, pos.column);
             }
             case 'ArrayElements': {
                 const first = children[0] as ASTNode;
                 const others = children.length > 1 ? (children[1] as ArgList).args : [];
-                return new ArgList([first, ...others], pos.line, pos.column); // Use ArgList as a temp holder
+                return new ArgList([first, ...others], pos.line, pos.column);
             }
             case 'MoreArrayElements': {
                 if (children.length === 0) return new ArgList([], pos.line, pos.column);
@@ -301,15 +273,11 @@ class ASTBuilder {
             case 'ArrayMember': {
                 return children[0] as ASTNode;
             }
-
             default:
-                // For rules like <E> -> <T> etc.
                 if (children.length === 1 && children[0] instanceof ASTNode) {
                     return children[0];
                 }
                 console.warn(`Unhandled AST action: ${actionName}`);
-                // Instead of throwing, we return a placeholder or the first child if it's a node
-                // This helps to pinpoint grammar issues without crashing
                 return children[0] instanceof ASTNode ? children[0] : new Identifier(`UNHANDLED:${actionName}`, pos.line, pos.column);
         }
     }

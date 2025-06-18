@@ -3,7 +3,7 @@ import {
     AssignExpr, BinaryExpr, UnaryExpr, CallExpr, Literal, Identifier,
     ArrayLiteral, ArrayAccess, Param
 } from '../ast/entity';
-import { SymbolTable, SymbolEntry, Scope } from '../symbolTable/symbolTable'; // Импортируем Scope
+import { SymbolTable, SymbolEntry, Scope } from '../symbolTable/symbolTable';
 import { ErrorHandler, ErrorType } from '../error/error';
 
 function typeToString(type: string | null): string {
@@ -34,7 +34,6 @@ export class SemanticAnalyzer {
             case ReturnStmt:        this.visitReturnStmt(node as ReturnStmt); return null;
             case IfStmt:            this.visitIfStmt(node as IfStmt); return null;
             case WhileStmt:         this.visitWhileStmt(node as WhileStmt); return null;
-
             case Literal:           return this.visitLiteral(node as Literal);
             case Identifier:        return this.visitIdentifier(node as Identifier);
             case BinaryExpr:        return this.visitBinaryExpr(node as BinaryExpr);
@@ -48,7 +47,9 @@ export class SemanticAnalyzer {
     }
 
     private visitBlock(node: Block): void {
-        this.symbolTable.enterScope(`block@${node.line}:${node.column}`);
+        const blockScope = this.symbolTable.enterScope(`block@${node.line}:${node.column}`);
+        (node as any).scope = blockScope;
+        console.log(`[SA] visitBlock for ${blockScope.name}, created scope with _debug_id: ${blockScope._debug_id}`);
         for (const statement of node.statements) {
             this.visit(statement);
         }
@@ -78,12 +79,17 @@ export class SemanticAnalyzer {
                 `Symbol '${node.name}' already declared in the current scope`,
                 node.line, node.column, ErrorType.Semantic
             );
+        } else {
+            if (this.currentFunction && this.symbolTable.currentScope !== this.symbolTable.globalScope) {
+                if (!symbol.isFunction) {
+                    symbol.localIndex = this.symbolTable.getNextFunctionLocalIndex();
+                }
+            }
         }
     }
 
     private visitFuncDecl(node: FuncDecl): void {
         const paramTypes = node.params.map(p => p.type);
-
         const funcEntry = this.symbolTable.add(node.name, 'function', undefined, true, paramTypes, node.returnType);
 
         if (!funcEntry) {
@@ -93,6 +99,7 @@ export class SemanticAnalyzer {
 
         const previousFunction = this.currentFunction;
         this.currentFunction = funcEntry;
+        this.symbolTable.beginFunctionScope();
 
         const functionBodyScope = this.symbolTable.enterScope(`function_body_${node.name}`);
         funcEntry.functionBodyScope = functionBodyScope;
@@ -100,20 +107,16 @@ export class SemanticAnalyzer {
         for (const param of node.params) {
             const paramSymbol = this.symbolTable.add(param.name, param.type);
             if (!paramSymbol) {
-                // Используем line/column всего объявления функции для ошибки параметра,
-                // так как у самого Param нет этой информации.
                 this.errorHandler.addError(
                     `Parameter name '${param.name}' is already declared or invalid in function '${node.name}'.`,
-                    node.line, // Используем строку всего объявления функции
-                    node.column, // Используем колонку всего объявления функции (или можно попытаться найти колонку параметра)
+                    node.line,
+                    node.column,
                     ErrorType.Semantic
                 );
+            } else {
+                paramSymbol.localIndex = this.symbolTable.getNextFunctionLocalIndex();
             }
-            // Если нужно точнее, то парсер должен добавлять line/column в AST-узел Param
-            // (param as any).resolvedType = param.type; // Это не нужно, т.к. param.type уже есть
         }
-
-        // (node as any).resolvedType = node.returnType; // Это не нужно, тип функции хранится в SymbolEntry
 
         this.visit(node.body);
 
@@ -121,14 +124,11 @@ export class SemanticAnalyzer {
         this.currentFunction = previousFunction;
     }
 
-    // ... (остальной код без изменений в этом ответе, предполагаем, что он из предыдущего) ...
-    // Убедитесь, что все изменения для visitBinaryExpr и т.д. из предыдущего ответа применены.
     private visitBinaryExpr(node: BinaryExpr): string | null {
         const leftType = this.visit(node.left);
         const rightType = this.visit(node.right);
 
         if (!leftType || !rightType) {
-            // (node as any).resolvedType = null; // Присвоение типа узлу здесь необязательно, если visit возвращает тип
             return null;
         }
         let resultType: string | null = null;
@@ -143,9 +143,6 @@ export class SemanticAnalyzer {
                 break;
             case '<':
             case '>':
-                // >=, <=, && - если вы их добавили в грамматику и хотите поддерживать
-                // case '<=':
-                // case '>=':
                 if (leftType === 'num' && rightType === 'num') {
                     resultType = 'bool';
                 }
@@ -156,31 +153,19 @@ export class SemanticAnalyzer {
                     resultType = 'bool';
                 }
                 break;
-            // case '&&':
-            //     if (leftType === 'bool' && rightType === 'bool') {
-            //         resultType = 'bool';
-            //     }
-            //     break;
         }
 
         if (resultType) {
-            // (node as any).resolvedType = resultType; // Присвоение типа узлу здесь необязательно
             return resultType;
         } else {
             this.errorHandler.addError(
                 `Operator '${node.operator}' cannot be applied to types '${typeToString(leftType)}' and '${typeToString(rightType)}'`,
                 node.line, node.column, ErrorType.Semantic
             );
-            // (node as any).resolvedType = null; // Присвоение типа узлу здесь необязательно
             return null;
         }
     }
 
-    // Убедитесь, что остальные visit-методы обновлены согласно предыдущим рекомендациям
-    // и вашей текущей грамматике.
-    // Особенно visitUnaryExpr, visitCallExpr, visitReturnStmt.
-    // ... (остальные методы visit...)
-    // ... (visitLiteral, visitIdentifier, visitIfStmt, visitWhileStmt)
     private visitAssignExpr(node: AssignExpr): void {
         const valueType = this.visit(node.value);
         const targetType = this.visit(node.target);
@@ -191,12 +176,11 @@ export class SemanticAnalyzer {
                 node.line, node.column, ErrorType.Semantic
             );
         }
-        // (node as any).resolvedType = valueType; // Необязательно
     }
+
     private visitUnaryExpr(node: UnaryExpr): string | null {
         const operandType = this.visit(node.operand);
         if (!operandType) {
-            // (node as any).resolvedType = null;
             return null;
         }
 
@@ -207,22 +191,15 @@ export class SemanticAnalyzer {
                     resultType = 'num';
                 }
                 break;
-            // case '!': // Если есть в грамматике и поддерживается
-            //     if (operandType === 'bool') {
-            //         resultType = 'bool';
-            //     }
-            //     break;
         }
 
         if (resultType) {
-            // (node as any).resolvedType = resultType;
             return resultType;
         } else {
             this.errorHandler.addError(
                 `Operator '${node.operator}' cannot be applied to type '${typeToString(operandType)}'`,
                 node.line, node.column, ErrorType.Semantic
             );
-            // (node as any).resolvedType = null;
             return null;
         }
     }
@@ -234,7 +211,6 @@ export class SemanticAnalyzer {
                 `'${node.callee}' is not a function or not found`,
                 node.line, node.column, ErrorType.Semantic
             );
-            // (node as any).resolvedType = null;
             return null;
         }
 
@@ -260,7 +236,6 @@ export class SemanticAnalyzer {
         }
 
         const returnType = symbol.returnType || 'void';
-        // (node as any).resolvedType = returnType;
         return returnType;
     }
 
@@ -272,7 +247,6 @@ export class SemanticAnalyzer {
                 `Cannot access index of non-array type '${typeToString(arrayType)}'`,
                 node.line, node.column, ErrorType.Semantic
             );
-            // (node as any).resolvedType = null;
             return null;
         }
 
@@ -285,19 +259,16 @@ export class SemanticAnalyzer {
         }
 
         const elementType = arrayType.slice(0, -2);
-        // (node as any).resolvedType = elementType;
         return elementType;
     }
 
     private visitArrayLiteral(node: ArrayLiteral): string | null {
         if (node.elements.length === 0) {
-            // (node as any).resolvedType = 'any[]';
             return 'any[]';
         }
 
         const firstElementType = this.visit(node.elements[0]);
         if (!firstElementType) {
-            // (node as any).resolvedType = null;
             return null;
         }
 
@@ -308,12 +279,10 @@ export class SemanticAnalyzer {
                     `Array elements must have a consistent type. Expected '${typeToString(firstElementType)}' but found '${typeToString(elementType)}'`,
                     node.elements[i].line, node.elements[i].column, ErrorType.Semantic
                 );
-                // (node as any).resolvedType = null;
                 return null;
             }
         }
         const arrayType = `${firstElementType}[]`;
-        // (node as any).resolvedType = arrayType;
         return arrayType;
     }
 
@@ -366,7 +335,6 @@ export class SemanticAnalyzer {
         else if (typeof node.value === 'boolean') type = 'bool';
         else type = 'unknown';
 
-        // (node as any).resolvedType = type;
         return type;
     }
 
@@ -377,10 +345,8 @@ export class SemanticAnalyzer {
                 `Symbol '${node.name}' not found`,
                 node.line, node.column, ErrorType.Semantic
             );
-            // (node as any).resolvedType = null;
             return null;
         }
-        // (node as any).resolvedType = symbol.type;
         return symbol.type;
     }
 
