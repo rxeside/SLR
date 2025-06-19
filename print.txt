@@ -1,0 +1,12 @@
+let a: string = "Hello";
+let b: string = "World";
+let c: num = 3;
+
+if (c == 4)
+{
+    println(a + b);
+}
+else
+{
+    println(a + b + c);
+}

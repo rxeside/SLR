@@ -1,0 +1,29 @@
+let a: num[] = [123, 2, 19];
+
+function bubbleSort(arr: num[]): num[]
+{
+    let size: num = 0;
+    let i: num = 0;
+    let j: num = 0;
+    let temp: num = 0;
+
+    size = arrayLength(arr);
+
+    while (i < size) {
+        j = 0;
+        while (j < (size - i) - 1) {
+            if (arr[j] > arr[j + 1])
+            {
+                temp = arr[j];
+                arr[j] = arr[j + 1];
+                arr[j + 1] = temp;
+            }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+
+    return arr;
+}
+
+println(bubbleSort(a));
