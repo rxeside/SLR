@@ -2,7 +2,7 @@ import fs from 'fs';
 import { Lexer } from './lexer/lexer';
 import { SLRParser } from './slr/slr';
 import { fullGrammar } from '../integration-tests/grammars';
-import { Program, VarDecl, AssignExpr, Identifier } from './ast/entity';
+import { VarDecl, AssignExpr, Identifier } from './ast/entity';
 import { CodeGenerator } from './generator/generator';
 import { SemanticAnalyzer } from './analyzer/analyzer';
 import { SymbolTable } from './symbolTable/symbolTable';

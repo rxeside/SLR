@@ -1,0 +1,110 @@
+.def
+.argc 0
+.locals 2
+.name __EntryPoint__
+.constants
+number 123
+number 2
+number 19
+string println
+.code
+1 const 0
+1 const 1
+1 const 2
+1 create_arr 3
+1 set_local 0
+23 load_fn 1
+23 set_local 1
+23 get_local 0
+23 get_local 1
+23 call 1
+23 get_global 3
+23 call 1
+23 pop
+23 return
+.end_def
+
+
+.def
+.argc 1
+.locals 4
+.name bubbleSort
+.constants
+string arrayLength
+number 0
+number 1
+.code
+5 get_local 0
+5 get_global 0
+5 call 1
+5 set_local 1
+7 const 1
+7 set_local 2
+forcond2:
+7 get_local 2
+7 get_local 1
+7 clt
+20 jmp_false forend2
+20 jmp forblock2
+foraction2:
+7 get_local 2
+7 inc_local 2
+7 pop
+20 jmp forcond2
+forblock2:
+9 const 1
+9 set_local 3
+forcond1:
+9 get_local 3
+9 get_local 1
+9 get_local 2
+9 sub
+9 const 2
+9 sub
+9 clt
+18 jmp_false forend1
+18 jmp forblock1
+foraction1:
+9 get_local 3
+9 inc_local 3
+9 pop
+18 jmp forcond1
+forblock1:
+11 get_local 0
+11 get_local 3
+11 get_property
+11 get_local 0
+11 get_local 3
+11 const 2
+11 add
+11 get_property
+11 cgt
+17 jmp_false endif1
+13 get_local 0
+13 get_local 3
+13 get_property
+13 set_local 4
+14 get_local 0
+14 get_local 3
+14 const 2
+14 add
+14 get_property
+14 get_local 0
+14 get_local 3
+14 set_property
+14 pop
+15 get_local 4
+15 get_local 0
+15 get_local 3
+15 const 2
+15 add
+15 set_property
+15 pop
+endif1:
+18 jmp foraction1
+forend1:
+20 jmp foraction2
+forend2:
+20 get_local 0
+20 return
+.end_def

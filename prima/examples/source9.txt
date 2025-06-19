@@ -1,0 +1,18 @@
+const a = 3;
+
+function add(b)
+{
+    function sub(c)
+    {
+        function ded(d, b)
+        {
+            return a + d + b - c;
+        }
+
+        return ded(a, c + 1);
+    }
+
+    return sub(b);
+}
+
+println(add(5));
