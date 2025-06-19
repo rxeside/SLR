@@ -51,7 +51,20 @@ class ConstDecl extends ASTNode {
     }
 }
 
+export class Upvalue {
+    constructor(
+        public name: string,
+        // Индекс переменной в стеке родительской функции (или индекс в списке upvalues родителя)
+        public index: number, 
+        // true - если переменная является локальной для родителя, 
+        // false - если это уже upvalue для родителя
+        public isLocal: boolean 
+    ) {}
+}
+
 class FuncDecl extends ASTNode {
+    public upvalues: Upvalue[] = [];
+    
     constructor(
         public name: string,
         public params: Param[],
@@ -101,7 +114,7 @@ class UnaryExpr extends ASTNode {
 }
 
 class CallExpr extends ASTNode {
-    constructor(public callee: string, public args: ASTNode[]) {
+    constructor(public callee: Identifier, public args: ASTNode[]) {
         super();
     }
 
@@ -121,6 +134,12 @@ class Literal extends ASTNode {
 }
 
 class Identifier extends ASTNode {
+    public resolution?: {
+        type: 'local' | 'global' | 'upvalue';
+        depth: number;
+        index: number;
+    };
+
     constructor(public name: string) {
         super();
     }
@@ -180,7 +199,7 @@ class ReturnStmt extends ASTNode {
     }
 }
 
-class ArrayLiteral extends ASTNode {
+export class ArrayLiteral extends ASTNode {
     constructor(public elements: ASTNode[]) {
         super();
     }
@@ -190,7 +209,7 @@ class ArrayLiteral extends ASTNode {
     }
 }
 
-class ArrayAccess extends ASTNode {
+export class ArrayAccess extends ASTNode {
     constructor(public array: ASTNode, public index: ASTNode) {
         super();
     }
@@ -238,8 +257,6 @@ export {
     WhileStmt,
     ForStmt,
     ReturnStmt,
-    ArrayLiteral,
-    ArrayAccess,
     ParamList,
-    ArgList,
-}
+    ArgList
+};

@@ -1,17 +1,20 @@
-import { ASTNode, Program, VarDecl, FuncDecl, Block, IfStmt, WhileStmt, ReturnStmt, AssignExpr, BinaryExpr, UnaryExpr, CallExpr, Literal, Identifier, ArrayLiteral, ArrayAccess, Param, ParamList, ArgList } from '../ast/entity';
+import { ASTNode, Program, VarDecl, FuncDecl, Block, IfStmt, WhileStmt, ReturnStmt, AssignExpr, BinaryExpr, UnaryExpr, CallExpr, Literal, Identifier, ArrayLiteral, ArrayAccess, Param, ParamList, ArgList, Upvalue } from '../ast/entity';
 import { SymbolTable, SymbolEntry } from '../symbolTable/symbolTable';
 import { SemanticError } from './error';
 
 export class SemanticAnalyzer {
     private symbolTable: SymbolTable;
     private currentFunction: SymbolEntry | null = null;
+    private funcStack: FuncDecl[] = [];
 
     constructor(symbolTable: SymbolTable) {
         this.symbolTable = symbolTable;
     }
 
     public analyze(ast: Program): void {
+        this.symbolTable.enterScope('__EntryPoint__');
         this.visit(ast);
+        this.symbolTable.exitScope();
     }
 
     private visit(node: ASTNode): string | null {
@@ -26,11 +29,11 @@ export class SemanticAnalyzer {
             case WhileStmt:         this.visitWhileStmt(node as WhileStmt); return null;
             
             // Expressions
+            case CallExpr:          return this.visitCallExpr(node as CallExpr);
             case Literal:           return this.visitLiteral(node as Literal);
             case Identifier:        return this.visitIdentifier(node as Identifier);
             case BinaryExpr:        return this.visitBinaryExpr(node as BinaryExpr);
             case UnaryExpr:         return this.visitUnaryExpr(node as UnaryExpr);
-            case CallExpr:          return this.visitCallExpr(node as CallExpr);
             case ArrayAccess:       return this.visitArrayAccess(node as ArrayAccess);
             case ArrayLiteral:      return this.visitArrayLiteral(node as ArrayLiteral);
 
@@ -59,32 +62,48 @@ export class SemanticAnalyzer {
     }
 
     private visitFuncDecl(node: FuncDecl): void {
+        if (this.symbolTable.lookupCurrentScope(node.name)) {
+            throw new SemanticError(`Function '${node.name}' already declared in this scope.`);
+        }
         const paramTypes = node.params.map(p => p.type);
         const funcEntry = this.symbolTable.add(node.name, 'function', undefined, true, paramTypes, node.returnType, true);
         if (!funcEntry) {
             throw new SemanticError(`Function '${node.name}' already declared.`);
         }
+
         this.currentFunction = funcEntry;
-        this.symbolTable.enterScope();
+        this.funcStack.push(node);
+
+        this.symbolTable.enterScope(node.name);
         for (const param of node.params) {
             this.symbolTable.add(param.name, param.type);
         }
-        this.visit(node.body);
-        this.symbolTable.exitScope();
-        this.currentFunction = null;
-    }
-
-    private visitBlock(node: Block): void {
-        this.symbolTable.enterScope();
-        for (const statement of node.statements) {
+        for (const statement of node.body.statements) {
             this.visit(statement);
         }
         this.symbolTable.exitScope();
+
+        this.funcStack.pop();
+        this.currentFunction = this.funcStack.length > 0
+            ? this.symbolTable.lookup(this.funcStack[this.funcStack.length - 1].name) || null
+            : null;
+    }
+
+    private visitBlock(node: Block): void {
+        // this.symbolTable.enterScope();
+        for (const statement of node.statements) {
+            this.visit(statement);
+        }
+        // this.symbolTable.exitScope();
     }
 
     private visitAssignExpr(node: AssignExpr): void {
         const valueType = this.visit(node.value);
         const targetType = this.visit(node.target);
+
+        // A bit of a hack for empty arrays
+        if (targetType === 'any[]') return;
+        if (valueType === 'any[]') return;
 
         if (targetType !== valueType) {
             throw new SemanticError(`Type mismatch: cannot assign '${valueType}' to '${targetType}'`);
@@ -97,9 +116,15 @@ export class SemanticAnalyzer {
 
         switch (node.operator) {
             case '+':
+                if (leftType === 'num' && rightType === 'num') return 'num';
+                if (leftType === 'string' && rightType === 'string') return 'string';
+                if (leftType === 'string' && rightType === 'num') return 'string';
+                if (leftType === 'num' && rightType === 'string') return 'string';
+                break;
             case '-':
             case '*':
             case '/':
+            case '%':
                 if (leftType === 'num' && rightType === 'num') return 'num';
                 break;
             case '<':
@@ -118,20 +143,39 @@ export class SemanticAnalyzer {
     }
 
     private visitCallExpr(node: CallExpr): string {
-        const symbol = this.symbolTable.lookup(node.callee);
+        const calleeName = node.callee.name;
+        this.visit(node.callee); // Visit the identifier to resolve it
+        const symbol = this.symbolTable.lookup(calleeName);
+
         if (!symbol || !symbol.isFunction) {
-            throw new SemanticError(`Function '${node.callee}' not found or not a function`);
+            throw new SemanticError(`'${calleeName}' is not a function`);
         }
 
-        if (symbol.argCount !== node.args.length) {
-            throw new SemanticError(`Function '${node.callee}' expects ${symbol.argCount} arguments, but received ${node.args.length}`);
+        const paramTypes = symbol.paramTypes || [];
+        const args = node.args || [];
+
+        // Special case for functions accepting 'any' type, like 'print'
+        if (paramTypes.length === 1 && paramTypes[0] === 'any') {
+            // For 'print'-like functions, we just analyze the arguments but don't check count.
+            for (const arg of args) {
+                this.visit(arg);
+            }
+            return symbol.returnType || 'void';
         }
 
-        for (let i = 0; i < node.args.length; i++) {
-            const argType = this.visit(node.args[i]);
-            const paramType = symbol.paramTypes[i];
-            if (argType !== paramType) {
-                throw new SemanticError(`Type mismatch: Argument ${i + 1} for function '${node.callee}' expects '${paramType}', but received '${argType}'`);
+        // Strict argument count check for all other functions
+        if (paramTypes.length !== args.length) {
+            throw new SemanticError(`Function '${calleeName}' expects ${paramTypes.length} arguments, but received ${args.length}`);
+        }
+
+        // Type check for each argument
+        for (let i = 0; i < args.length; i++) {
+            const argNode = args[i];
+            const argType = this.visit(argNode);
+            const expectedType = paramTypes[i];
+
+            if (argType !== expectedType) {
+                throw new SemanticError(`Type mismatch: Argument ${i + 1} for function '${calleeName}' expects '${expectedType}', but received '${argType}'`);
             }
         }
 
@@ -141,31 +185,33 @@ export class SemanticAnalyzer {
     private visitArrayAccess(node: ArrayAccess): string {
         const arrayType = this.visit(node.array);
         if (!arrayType.endsWith('[]')) {
-            throw new SemanticError(`Cannot access index of non-array type '${arrayType}'`);
+            throw new SemanticError(`Cannot perform array access on non-array type '${arrayType}'.`);
         }
         
         const indexType = this.visit(node.index);
         if (indexType !== 'num') {
-            throw new SemanticError(`Array index must be of type 'num', but got '${indexType}'`);
+            throw new SemanticError(`Array index must be of type 'num', but got '${indexType}'.`);
         }
 
-        return arrayType.slice(0, -2); // returns element type
+        // Return the element type, e.g., 'num' from 'num[]'
+        return arrayType.slice(0, -2);
     }
 
     private visitArrayLiteral(node: ArrayLiteral): string {
         if (node.elements.length === 0) {
-            return 'any[]'; // or handle as a special case
+            // This is tricky in a statically typed language without generics.
+            // For now, we'll call it an 'any[]' and let type checking be loose.
+            return 'any[]';
         }
 
-        const firstElementType = this.visit(node.elements[0]);
+        const firstType = this.visit(node.elements[0]);
         for (let i = 1; i < node.elements.length; i++) {
-            const elementType = this.visit(node.elements[i]);
-            if (elementType !== firstElementType) {
-                throw new SemanticError(`Array elements must have the same type. Found '${firstElementType}' and '${elementType}'`);
+            const elType = this.visit(node.elements[i]);
+            if (elType !== firstType) {
+                throw new SemanticError(`All elements in an array literal must have the same type. Found '${firstType}' and '${elType}'.`);
             }
         }
-
-        return `${firstElementType}[]`;
+        return `${firstType}[]`;
     }
 
     private visitReturnStmt(node: ReturnStmt): void {
@@ -189,17 +235,63 @@ export class SemanticAnalyzer {
     }
 
     private visitIdentifier(node: Identifier): string {
-        const symbol = this.symbolTable.lookup(node.name);
-        if (!symbol) {
-            throw new SemanticError(`Symbol '${node.name}' not found`);
+        const resolution = this.symbolTable.resolve(node.name);
+
+        if (!resolution) {
+            // It might be a built-in function like 'print'
+            const globalSymbol = this.symbolTable.lookupGlobal(node.name);
+            if (globalSymbol && globalSymbol.isFunction) {
+                 node.resolution = { type: 'global', depth: 999, index: -1 }; // Index resolved in generator
+                 return globalSymbol.returnType || 'void';
+            }
+            throw new SemanticError(`Undeclared identifier '${node.name}'`);
         }
-        return symbol.type;
+
+        const { entry, depth, scope } = resolution;
+
+        if (depth === 0) { // Local variable
+            node.resolution = { type: 'local', depth: 0, index: entry.localIndex };
+        } else if (scope === this.symbolTable.getGlobalScope()) { // Global variable
+             node.resolution = { type: 'global', depth, index: entry.localIndex };
+        } else { // Upvalue
+            const upvalueIndex = this.addUpvalue(node.name, this.funcStack.length - 1, depth);
+            node.resolution = { type: 'upvalue', depth, index: upvalueIndex };
+        }
+
+        return entry.type;
+    }
+
+    private addUpvalue(name: string, funcIndex: number, depth: number): number {
+        const currentFunc = this.funcStack[funcIndex];
+
+        // First, check if this function already captures this variable
+        const existingUpvalue = currentFunc.upvalues.find(up => up.name === name);
+        if (existingUpvalue) {
+            return currentFunc.upvalues.indexOf(existingUpvalue);
+        }
+
+        // If the variable is in the immediate parent scope (depth=1), we capture it directly.
+        if (depth === 1) {
+             const resolution = this.symbolTable.resolve(name);
+             if (!resolution) throw new Error("Resolution failed, should not happen");
+            
+            const upvalue = new Upvalue(name, resolution.entry.localIndex, true);
+            currentFunc.upvalues.push(upvalue);
+            return currentFunc.upvalues.length - 1;
+        }
+
+        // If the variable is further up, we need to ask our parent to capture it,
+        // and then we capture it from our parent.
+        const parentUpvalueIndex = this.addUpvalue(name, funcIndex - 1, depth - 1);
+        const upvalue = new Upvalue(name, parentUpvalueIndex, false); // isLocal = false
+        currentFunc.upvalues.push(upvalue);
+        return currentFunc.upvalues.length - 1;
     }
 
     private visitIfStmt(node: IfStmt): void {
         const conditionType = this.visit(node.condition);
-        if (conditionType !== 'bool') {
-            throw new SemanticError(`If statement condition must be a boolean, but got '${conditionType}'`);
+        if (conditionType !== 'bool' && conditionType !== 'num') {
+            throw new SemanticError(`If statement condition must be a boolean or a number, but got '${conditionType}'`);
         }
         this.visit(node.thenBranch);
         if (node.elseBranch) {

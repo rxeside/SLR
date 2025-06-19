@@ -2,18 +2,18 @@
 .argc 0
 .locals 1
 .name __EntryPoint__
-
 .constants
 number 1
-
+string println
 .code
 1 const 0
 1 set_local 0
 3 get_local 0
-8 jmp_false endif1
-
+6 jmp_false endif1
 5 get_local 0
+5 get_global 1
+5 call 1
 5 pop
-
 endif1:
-8 return
+6 return
+.end_def

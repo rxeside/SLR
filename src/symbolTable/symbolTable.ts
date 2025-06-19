@@ -131,6 +131,25 @@ export class SymbolTable {
         return this.currentScope.symbols.get(name);
     }
 
+    resolve(name: string): { entry: SymbolEntry; depth: number, scope: Scope } | undefined {
+        let depth = 0;
+        let scope = this.currentScope;
+        while (scope) {
+            const entry = scope.symbols.get(name);
+            if (entry) {
+                return { entry, depth, scope };
+            }
+            if (scope === this.globalScope) break;
+            scope = scope.parent;
+            depth++;
+        }
+        return undefined;
+    }
+
+    getGlobalScope(): Scope {
+        return this.globalScope;
+    }
+
     private getNextLocalIndex(scope: Scope): number {
         let maxIndex = -1;
         for (const entry of scope.symbols.values()) {

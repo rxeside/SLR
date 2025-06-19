@@ -1,0 +1,97 @@
+.def
+.name isPrime
+.argc 1
+.locals 1
+.constants
+number 2
+bool false
+bool true
+number 0
+string sqrt
+number 1
+.code
+2 get_local 0
+2 const 0
+2 clt
+5 jmp_false 11
+4 const 1
+4 return
+8 get_local 0
+8 const 0
+8 ceq
+11 jmp_false 22
+10 const 2
+10 return
+14 get_local 0
+14 const 0
+14 mod
+14 const 3
+14 ceq
+17 jmp_false 36
+16 const 1
+16 return
+20 get_local 0
+20 get_global 4
+20 call 1
+20 const 5
+20 add
+20 set_local 1
+21 get_local 1
+21 clt
+25 jmp_false 77
+22 get_local 0
+22 get_local 1
+22 mod
+22 const 3
+22 ceq
+25 jmp_false 67
+24 const 1
+24 return
+26 get_local 1
+26 const 0
+26 add
+26 set_local 1
+27 jmp 47
+29 const 2
+29 return
+.end_def
+.def
+.name __EntryPoint__
+.argc 0
+.locals 4
+.constants
+string isPrime
+number 10
+number 100
+number 1
+string println
+.code
+1 load_fn 0
+1 set_local 0
+32 const 1
+32 set_local 1
+33 const 2
+33 set_local 2
+35 get_local 1
+35 set_local 3
+36 get_local 3
+36 get_local 2
+36 const 3
+36 add
+36 clt
+41 jmp_false 53
+38 get_local 0
+38 get_local 3
+38 call 1
+41 jmp_false 43
+40 get_local 4
+40 get_local 3
+40 call 1
+40 pop
+42 get_local 3
+42 const 3
+42 add
+42 set_local 3
+43 jmp 16
+43 return
+.end_def

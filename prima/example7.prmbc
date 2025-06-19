@@ -6,7 +6,7 @@
 number 123
 number 2
 number 19
-string "println"
+string println
 .code
 1 const 0
 1 const 1
@@ -17,24 +17,26 @@ string "println"
 23 set_local 1
 23 get_local 0
 23 get_local 1
-23 call
+23 call 1
 23 get_global 3
-23 call
+23 call 1
 23 pop
 23 return
+.end_def
+
 
 .def
 .argc 1
 .locals 4
 .name bubbleSort
 .constants
-string "arrayLength"
+string arrayLength
 number 0
 number 1
 .code
 5 get_local 0
 5 get_global 0
-5 call
+5 call 1
 5 set_local 1
 7 const 1
 7 set_local 2
@@ -70,41 +72,33 @@ foraction1:
 forblock1:
 11 get_local 0
 11 get_local 3
-11 get_el
+11 get_property
 11 get_local 0
 11 get_local 3
 11 const 2
 11 add
-11 get_el
+11 get_property
 11 cgt
 17 jmp_false endif1
 13 get_local 0
 13 get_local 3
-13 get_el
+13 get_property
 13 set_local 4
 14 get_local 0
 14 get_local 3
 14 const 2
 14 add
-14 get_el
+14 get_property
 14 get_local 0
 14 get_local 3
-14 set_el
-14 get_local 0
-14 get_local 3
-14 get_el
+14 set_property
 14 pop
 15 get_local 4
 15 get_local 0
 15 get_local 3
 15 const 2
 15 add
-15 set_el
-15 get_local 0
-15 get_local 3
-15 const 2
-15 add
-15 get_el
+15 set_property
 15 pop
 endif1:
 18 jmp foraction1
@@ -113,3 +107,4 @@ forend1:
 forend2:
 20 get_local 0
 20 return
+.end_def

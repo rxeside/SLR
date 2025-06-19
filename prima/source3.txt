@@ -1,4 +1,4 @@
-function isPrime(num: number): bool
+function isPrime(num)
 {
     if (num < 2)
     {
@@ -15,7 +15,7 @@ function isPrime(num: number): bool
         return false;
     }
 
-    for (var i: number = 3; i < sqrt(num) + 1; i = i + 2)
+    for (var i = 3; i < sqrt(num) + 1; i = i + 2)
     {
         if (num % i == 0)
         {
@@ -26,10 +26,10 @@ function isPrime(num: number): bool
     return true;
 }
 
-const start: number = 10;
-const end: number = 100;
+const start = 10;
+const end = 100;
 
-for (var num: number = start; num < end + 1; num = num + 1)
+for (var num = start; num < end + 1; num = num + 1)
 {
     if (isPrime(num))
     {

@@ -1,1 +1,1 @@
- 
+ npx jest integration-tests/compiler-pvm.test.ts

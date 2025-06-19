@@ -1,0 +1,8 @@
+
+            let a: num = 10;
+            let b: num = 5;
+            println(a + b);
+            println(a - b);
+            println(a * b);
+            println(a / b);
+        

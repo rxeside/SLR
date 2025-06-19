@@ -1,7 +1,7 @@
 import { Lexer } from '../src/lexer/lexer';
 import { SLRParser } from '../src/slr/slr';
 import { Program, VarDecl, Literal, IfStmt, Block, BinaryExpr, Identifier, WhileStmt, CallExpr, ArrayLiteral, ArrayAccess } from '../src/ast/entity';
-import { fullGrammar } from './grammars';
+import { fullGrammar } from '../src/grammar/grammars';
 
 describe('Compiler Integration Tests', () => {
 

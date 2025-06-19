@@ -2,13 +2,11 @@
 .argc 0
 .locals 4
 .name __EntryPoint__
-
 .constants
 number 1
 number 2
 number 3
-string "println"
-
+string println
 .code
 1 const 0
 1 set_local 0
@@ -21,18 +19,19 @@ string "println"
 10 set_local 3
 10 const 1
 10 get_local 3
-10 call
+10 call 1
 10 get_global 3
-10 call
+10 call 1
 10 pop
 10 return
+.end_def
+
 
 .def
 .argc 1
 .locals 0
-.upvalue 0 2
 .name addA
-
+.parent_local 0 2
 .code
 7 get_local 0
 7 get_upvalue 0
@@ -40,3 +39,4 @@ string "println"
 7 get_upvalue 1
 7 add
 7 return
+.end_def

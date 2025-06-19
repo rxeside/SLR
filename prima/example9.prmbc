@@ -1,0 +1,77 @@
+.def
+.argc 0
+.locals 2
+.name __EntryPoint__
+.constants
+number 3
+number 5
+string println
+.code
+1 const 0
+1 set_local 0
+18 load_fn 1
+18 closure
+18 set_local 1
+18 const 1
+18 get_local 1
+18 call 1
+18 get_global 2
+18 call 1
+18 pop
+19 return
+.end_def
+
+
+.def
+.argc 1
+.locals 1
+.name add
+.parent_local 0
+.code
+15 load_fn 2
+15 closure
+15 set_local 1
+15 get_local 0
+15 get_local 1
+15 call 1
+15 return
+.end_def
+
+
+.def
+.argc 1
+.locals 1
+.name sub
+.parent_upvalue 0
+.constants
+number 1
+.code
+12 load_fn 3
+12 closure
+12 set_local 1
+12 get_upvalue 0
+12 get_local 0
+12 const 0
+12 add
+12 get_local 1
+12 call 2
+12 return
+.end_def
+
+
+.def
+.argc 2
+.locals 0
+.name ded
+.parent_local 0
+.parent_upvalue 0
+.code
+9 get_upvalue 1
+9 get_local 0
+9 add
+9 get_local 1
+9 add
+9 get_upvalue 0
+9 sub
+9 return
+.end_def

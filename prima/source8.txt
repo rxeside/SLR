@@ -1,0 +1,44 @@
+class Printable
+{
+    constructor()
+    {
+        this.printable = true;
+    }
+
+    print()
+    {
+        println("print");
+    }
+
+    move()
+    {
+        this.x = this.x + 100;
+        this.y = this.y + 100;
+    }
+}
+
+class Point extends Printable
+{
+    constructor(x, y)
+    {
+        super();
+        this.x = x;
+        this.y = y;
+    }
+
+    move(dx, dy)
+    {
+        super.move();
+        this.x = this.x + dx;
+        this.y = this.y + dy;
+    }
+}
+
+const p = new Point(10, 20);
+p.move(5, 5);
+p.print();
+const move = p.move;
+move(5, 5);
+println(p.x);
+println(p.y);
+println(p.printable);

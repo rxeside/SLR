@@ -1,6 +1,6 @@
 import { Lexer } from "../src/lexer/lexer";
 import { SLRParser } from "../src/slr/slr";
-import { fullGrammar } from "./grammars";
+import { fullGrammar } from "../src/grammar/grammars";
 import { Program } from "../src/ast/entity";
 
 describe("SLR Integration Tests for Full Grammar", () => {

@@ -1,317 +1,432 @@
-type Value = number | string | boolean | null;
+import {
+    ASTNode,
+    Program,
+    VarDecl,
+    FuncDecl,
+    Block,
+    IfStmt,
+    WhileStmt,
+    ForStmt,
+    ReturnStmt,
+    AssignExpr,
+    BinaryExpr,
+    CallExpr,
+    Literal,
+    Identifier,
+    Upvalue,
+    ArrayLiteral,
+    ArrayAccess
+} from '../ast/entity';
+import { SymbolTable, SymbolEntry } from '../symbolTable/symbolTable';
 
-// Представление скомпилированной инструкции
-interface Instruction {
-    line: number;
-    text: string;
-}
+class FunctionBytecode {
+    public instructions: { line: number, text: string }[] = [];
+    public constants: any[] = [];
+    
+    constructor(
+        public name: string,
+        public arity: number,
+        public localsCount: number,
+        public upvalues: Upvalue[] = []
+    ) {}
 
-// Представление скомпилированной функции
-interface CompiledFunction {
-    name: string;
-    arity: number;
-    instructions: Instruction[];
-}
-
-/**
- * Класс BytecodeWriter теперь сохраняет инструкции вместе с номерами строк.
- */
-class BytecodeWriter {
-    private instructions: Instruction[] = [];
-    private constants: Value[] = [];
-
-    /** Добавляет константу в таблицу, если её там ещё нет, и возвращает её индекс. */
-    public addConstant(value: Value): number {
-        const index = this.constants.indexOf(value);
-        if (index !== -1) {
-            return index;
+    emit(instruction: string, line: number = 1) {
+        // Don't emit line number for labels
+        if (instruction.endsWith(':')) {
+             this.instructions.push({ line: 0, text: instruction });
+        } else {
+             this.instructions.push({ line, text: instruction });
         }
+    }
+
+    addConstant(value: any): number {
+        const index = this.constants.findIndex(c => c === value);
+        if (index > -1) return index;
         this.constants.push(value);
         return this.constants.length - 1;
-    }
-
-    /** Сохраняет инструкцию вместе с номером строки. */
-    public writeInstruction(text: string, line: number): void {
-        this.instructions.push({ line, text });
-    }
-
-    public getInstructions() { return this.instructions; }
-    public getConstants() { return this.constants; }
-}
-
-// Управляет процессом компиляции для одной "области": глобальной или функции
-class Compiler {
-    private locals: { name: string, depth: number }[] = [];
-    public scopeDepth = 0;
-
-    constructor(public functionName: string, private arity: number) {
-        if (functionName !== 'global_scope') {
-            // Резервируем место для параметров, они будут первыми локальными переменными
-        }
-    }
-
-    public beginScope() { this.scopeDepth++; }
-    public endScope() { this.scopeDepth--; }
-
-    public addLocal(name: string): void {
-        this.locals.push({ name, depth: this.scopeDepth });
-    }
-
-    public resolveVariable(name: string): { type: 'local' | 'global', index: number } {
-        for (let i = this.locals.length - 1; i >= 0; i--) {
-            if (this.locals[i].name === name) {
-                return { type: 'local', index: i };
-            }
-        }
-        return { type: 'global', index: -1 };
-    }
-}
-
-class FunctionCompiler {
-    public constants: Value[] = [];
-    public instructions: Instruction[] = [];
-    public locals: string[] = [];
-    public labelCount = 0;
-
-    constructor(public name: string, public arity: number) {}
-
-    public addConstant(value: Value): number {
-        const index = this.constants.indexOf(value);
-        if (index !== -1) return index;
-        this.constants.push(value);
-        return this.constants.length - 1;
-    }
-
-    public addLocal(name: string): number {
-        if (this.locals.includes(name)) return this.locals.indexOf(name);
-        this.locals.push(name);
-        return this.locals.length - 1;
-    }
-
-    public resolveVariable(name: string): { type: 'local' | 'global'; index: number } {
-        const localIndex = this.locals.indexOf(name);
-        if (localIndex > -1) {
-            return { type: 'local', index: localIndex };
-        }
-        return { type: 'global', index: this.addConstant(name) };
-    }
-
-    public emit(text: string, line: number) {
-        this.instructions.push({ line, text });
-    }
-
-    public createLabel(name: string): string {
-        return `${name}${this.labelCount++}`;
     }
 }
 
 export class CodeGenerator {
-    private functions: FunctionCompiler[] = [];
-    private main: FunctionCompiler | null = null;
-    private currentCompiler: FunctionCompiler | null = null;
-    private userFunctionNames: string[] = [];
+    private symbolTable: SymbolTable;
+    private functions: FunctionBytecode[] = [];
+    private main!: FunctionBytecode;
+    private currentFunction!: FunctionBytecode;
+    private functionStack: FunctionBytecode[] = [];
+    private functionMap: Map<string, number> = new Map();
+    private _programNode!: Program;
+    private loopCounter = 0;
 
-    public generate(programNode: any): string {
-        const functionNodes = programNode.body.filter((n: any) => n.type === 'FunctionDeclaration');
-        this.userFunctionNames = functionNodes.map(n => n.id.name);
+    constructor(symbolTable: SymbolTable) {
+        this.symbolTable = symbolTable;
+    }
 
-        for (const funcNode of functionNodes) {
-            this.functions.push(this.compileFunction(funcNode));
-        }
+    public generate(programNode: Program): string {
+        this._programNode = programNode;
+        const functionDeclarations = programNode.statements.filter(s => s instanceof FuncDecl) as FuncDecl[];
+        const mainStatements = programNode.statements.filter(s => !(s instanceof FuncDecl));
 
-        this.main = new FunctionCompiler('__EntryPoint__', 0);
-        this.currentCompiler = this.main;
-        const mainStatements = programNode.body.filter((n: any) => n.type !== 'FunctionDeclaration');
+        // 0. Initialize main function container so it's available for context.
+        const mainLocalsCount = this.countLocals(programNode, true);
+        this.main = new FunctionBytecode('__EntryPoint__', 0, mainLocalsCount);
+        this.currentFunction = this.main;
+
+        // Pre-populate main's constants with global built-in functions
+        this.symbolTable.getGlobalScope().symbols.forEach((symbol) => {
+            if (symbol.isFunction) {
+                this.main.addConstant(symbol.name);
+            }
+        });
+
+        // 1. Register all function names so `load_fn` knows about them ahead of time.
+        functionDeclarations.forEach((node, i) => {
+            this.functionMap.set(node.name, i + 1); // PVM is 1-indexed for functions
+        });
         
-        this.scanForLocals(mainStatements, this.main);
-
-        for (const statement of mainStatements) {
-            this.visit(statement);
-        }
+        // 2. Compile each function's body. This will populate the `this.functions` array.
+        // This is done before compiling main so that upvalue analysis is correct.
+        functionDeclarations.forEach(node => this.compileFunction(node));
         
-        const lastLine = mainStatements.length > 0 ? mainStatements[mainStatements.length - 1].line : 1;
-        this.main!.emit(`return`, lastLine);
+        // 3. Now compile the main entry point.
+        this.currentFunction = this.main; // Switch context back to main
+        
+        this.symbolTable.enterScope('__EntryPoint__');
+        
+        // Add top-level declarations to the main symbol table scope
+        programNode.statements.forEach(stmt => {
+            if (stmt instanceof VarDecl) {
+                this.symbolTable.add(stmt.name, stmt.type);
+            } else if (stmt instanceof FuncDecl) {
+                // Functions are already compiled, but we need their symbol in the main scope
+                // to be able to call them.
+                this.symbolTable.add(stmt.name, 'function', undefined, true, [], stmt.returnType);
+            }
+        });
+        
+        // Process variable initializers in main
+        mainStatements.forEach(stmt => {
+            if (stmt instanceof VarDecl) {
+                this.visit(stmt);
+            }
+        });
 
+        // Hoist functions: create closures and store them in local variables.
+        functionDeclarations.forEach(node => {
+            this.hoistFunction(node);
+        });
+
+        // Visit the rest of the main statements (e.g., calls)
+        mainStatements.forEach(stmt => {
+            if (!(stmt instanceof VarDecl)) {
+                this.visit(stmt);
+                if (stmt instanceof CallExpr) {
+                    this.currentFunction.emit('pop');
+                }
+            }
+        });
+
+        this.emitReturnIfNeeded(this.main);
+        
+        this.symbolTable.exitScope();
         return this.serialize();
     }
 
-    private compileFunction(node: any): FunctionCompiler {
-        const func = new FunctionCompiler(node.id.name, node.params.length);
-        this.currentCompiler = func;
-        node.params.forEach((p: any) => func.addLocal(p.name));
-        this.scanForLocals(node.body.body, func);
-        this.visit(node.body);
-        return func;
+    private hoistFunction(node: FuncDecl) {
+        const funcIndex = this.functionMap.get(node.name)!;
+        this.currentFunction.emit(`load_fn ${funcIndex}`);
+        if (node.upvalues.length > 0) {
+            this.currentFunction.emit('closure');
+        }
+        const symbol = this.symbolTable.lookupCurrentScope(node.name);
+        if (symbol) {
+            this.currentFunction.emit(`set_local ${symbol.localIndex}`);
+        }
     }
 
-    private scanForLocals(statements: any[], compiler: FunctionCompiler) {
-        for (const stmt of statements) {
-            if (!stmt) continue;
-            if (stmt.type === 'VariableDeclaration') {
-                compiler.addLocal(stmt.declarations[0].id.name);
-            } else if (stmt.type === 'ForStatement') {
-                if (stmt.init && stmt.init.type === 'VariableDeclaration') {
-                    compiler.addLocal(stmt.init.declarations[0].id.name);
-                }
-                if (stmt.body.type === 'BlockStatement') this.scanForLocals(stmt.body.body, compiler);
-            } else if (stmt.type === 'IfStatement') {
-                if (stmt.consequent.type === 'BlockStatement') {
-                    this.scanForLocals(stmt.consequent.body, compiler);
-                }
-                if (stmt.alternate?.type === 'BlockStatement') {
-                    this.scanForLocals(stmt.alternate.body, compiler);
-                }
+    private compileFunction(node: FuncDecl) {
+        // Create the bytecode container BEFORE visiting, so `currentFunction` is correct.
+        const localsCount = this.countLocals(node.body);
+        const func = new FunctionBytecode(node.name, node.params.length, localsCount, node.upvalues);
+        this.functions.push(func);
+
+        this.functionStack.push(this.currentFunction); // Save current context
+        this.currentFunction = func;
+        
+        this.symbolTable.enterScope(node.name);
+        
+        node.params.forEach(p => this.symbolTable.add(p.name, p.type));
+        node.body.statements.forEach(s => {
+            if (s instanceof VarDecl) this.symbolTable.add(s.name, s.type);
+        })
+
+        this.visit(node.body);
+        this.emitReturnIfNeeded(func);
+        this.symbolTable.exitScope();
+
+        this.currentFunction = this.functionStack.pop()!; // Restore previous context
+    }
+
+    private emitReturnIfNeeded(func: FunctionBytecode) {
+        if (!func) return; // Guard against main not being initialized
+        const lastInstruction = func.instructions[func.instructions.length - 1];
+        if (!lastInstruction || !lastInstruction.text.includes('return')) {
+            this.currentFunction.emit('return');
+        }
+    }
+
+    private countLocals(node: Program | Block, countFunctionsAsLocals = false): number {
+        let count = 0;
+        for (const stmt of node.statements) {
+            if (stmt instanceof VarDecl) {
+                count++;
+            } else if (countFunctionsAsLocals && stmt instanceof FuncDecl) {
+                count++;
+            }
+        }
+        return count;
+    }
+    
+    private visit(node: ASTNode): void {
+        const visitorName = `visit${node.constructor.name}`;
+        const visitor = (this as any)[visitorName];
+        if (visitor) {
+            visitor.call(this, node);
+        } else {
+            throw new Error(`CodeGenerator: No visitor for ${node.constructor.name}`);
+        }
+    }
+    
+    private visitProgram(node: Program) {
+        node.statements.forEach(stmt => this.visit(stmt));
+    }
+
+    private visitBlock(node: Block) {
+        node.statements.forEach(s => {
+            this.visit(s);
+            if (s instanceof CallExpr) {
+                this.currentFunction.emit('pop');
+            }
+        });
+    }
+
+    private visitVarDecl(node: VarDecl) {
+        if (node.initializer) {
+            this.visit(node.initializer);
+            const symbol = this.symbolTable.lookupCurrentScope(node.name);
+            if (symbol) {
+                this.currentFunction.emit(`set_local ${symbol.localIndex}`);
             }
         }
     }
 
+    private visitReturnStmt(node: ReturnStmt) {
+        if (node.value) {
+            this.visit(node.value);
+        } else {
+            this.currentFunction.emit('const_null');
+        }
+        this.currentFunction.emit('return');
+    }
+
+    private visitAssignExpr(node: AssignExpr) {
+        this.visit(node.value);
+
+        if (node.target instanceof Identifier) {
+            const res = node.target.resolution;
+            if (!res) throw new Error(`unresolved assignment target ${node.target.name}`);
+            
+            if (res.type === 'local') this.currentFunction.emit(`set_local ${res.index}`);
+            else if (res.type === 'global') this.currentFunction.emit(`set_global ${this.currentFunction.addConstant(node.target.name)}`);
+            else if (res.type === 'upvalue') this.currentFunction.emit(`set_upvalue ${res.index}`);
+        } else if (node.target instanceof ArrayAccess) {
+            this.visitArrayAccess(node.target, true); // Pass true for isLhs
+            this.currentFunction.emit('set_property');
+            this.currentFunction.emit('pop'); // set_property might leave a value
+        }
+    }
+
+    private visitArrayLiteral(node: ArrayLiteral) {
+        node.elements.forEach(element => this.visit(element));
+        this.currentFunction.emit(`create_arr ${node.elements.length}`);
+    }
+
+    private visitArrayAccess(node: ArrayAccess, isLhs: boolean = false) {
+        this.visit(node.array);
+        this.visit(node.index);
+        if (!isLhs) {
+            this.currentFunction.emit('get_property');
+        }
+    }
+
+    private visitCallExpr(node: CallExpr) {
+        // Push arguments ONTO the stack FIRST
+        if (node.args) {
+            node.args.forEach(arg => this.visit(arg));
+        }
+
+        // Then, push the function/closure to be called by visiting its identifier
+        this.visit(node.callee);
+
+        // Finally, emit the call instruction
+        const argCount = node.args ? node.args.length : 0;
+        this.currentFunction.emit(`call ${argCount}`);
+    }
+
+    private visitIdentifier(node: Identifier) {
+        const res = node.resolution;
+        if (!res) {
+            // Probably a built-in function like 'print'
+            const global = this.symbolTable.lookupGlobal(node.name);
+            if (global?.isFunction) {
+                const constIndex = this.currentFunction.addConstant(node.name);
+                this.currentFunction.emit(`get_global ${constIndex}`);
+                return;
+            }
+            throw new Error(`unresolved identifier ${node.name}`);
+        }
+        
+        if (res.type === 'local') this.currentFunction.emit(`get_local ${res.index}`);
+        else if (res.type === 'global') this.currentFunction.emit(`get_global ${this.currentFunction.addConstant(node.name)}`);
+        else if (res.type === 'upvalue') this.currentFunction.emit(`get_upvalue ${res.index}`);
+    }
+
+    private visitLiteral(node: Literal) {
+        const constIndex = this.currentFunction.addConstant(node.value);
+        this.currentFunction.emit(`const ${constIndex}`);
+    }
+
+    private visitBinaryExpr(node: BinaryExpr) {
+        this.visit(node.left);
+        this.visit(node.right);
+
+        const opMap: { [key: string]: string } = {
+            '+': 'add',
+            '-': 'sub',
+            '*': 'mul',
+            '/': 'div',
+            '%': 'mod',
+            '<': 'clt',
+            '>': 'cgt',
+            '<=': 'clte',
+            '>=': 'cgte',
+            '==': 'ceq',
+            '!=': 'cneq',
+            '&&': 'and',
+            '||': 'or',
+        };
+
+        if (opMap[node.operator]) {
+            this.currentFunction.emit(opMap[node.operator]);
+        }
+    }
+
+    private visitIfStmt(node: IfStmt): void {
+        const ifId = this.loopCounter++;
+        const endIfLabel = `endif${ifId}`;
+        const elseLabel = `else_${this.functions.length}_${this.currentFunction.instructions.length}`;
+        const endLabel = `endif_${this.functions.length}_${this.currentFunction.instructions.length}`;
+
+        this.visit(node.condition);
+        this.currentFunction.emit(`jmp_false ${elseLabel}`);
+        
+        this.visit(node.thenBranch);
+        this.currentFunction.emit(`jmp ${endLabel}`);
+        
+        this.currentFunction.emit(elseLabel + ':');
+        if (node.elseBranch) {
+            this.visit(node.elseBranch);
+        }
+        
+        this.currentFunction.emit(endLabel + ':');
+    }
+
+    private visitWhileStmt(node: WhileStmt): void {
+        const loopId = this.loopCounter++;
+        const startLabel = `while_start_${loopId}`;
+        const endLabel = `while_end_${loopId}`;
+    
+        this.currentFunction.emit(`${startLabel}:`);
+        this.visit(node.condition);
+        this.currentFunction.emit(`jmp_false ${endLabel}`);
+    
+        this.visit(node.body);
+        this.currentFunction.emit(`jmp ${startLabel}`); 
+    
+        this.currentFunction.emit(`${endLabel}:`);
+    }
+
+    private visitForStmt(node: ForStmt): void {
+        const loopId = this.loopCounter++;
+        const condLabel = `forcond${loopId}`;
+        const actionLabel = `foraction${loopId}`;
+        const endLabel = `forend${loopId}`;
+
+        // 1. Initializer
+        if (node.init) {
+            this.visit(node.init);
+            // Pop the result of the initializer expression (e.g. the assigned value)
+            this.currentFunction.emit('pop');
+        }
+
+        this.currentFunction.emit(`${condLabel}:`);
+        // 2. Condition
+        if (node.condition) {
+            this.visit(node.condition);
+            this.currentFunction.emit(`jmp_false ${endLabel}`);
+        }
+        // If no condition, it's an infinite loop, so no jump.
+
+        // 3. Body
+        this.visit(node.body);
+
+        // 4. Update
+        this.currentFunction.emit(`${actionLabel}:`);
+        if (node.update) {
+            this.visit(node.update);
+            // Pop the result of the update expression
+            this.currentFunction.emit('pop');
+        }
+
+        // 5. Jump back to condition
+        this.currentFunction.emit(`jmp ${condLabel}`);
+
+        // 6. End label
+        this.currentFunction.emit(`${endLabel}:`);
+    }
+
     private serialize(): string {
-        let output = this.serializeFunction(this.main!);
+        let output = this.serializeFunction(this.main);
         for (const func of this.functions) {
-            output += '\n\n';
-            output += this.serializeFunction(func);
+            output += '\n\n' + this.serializeFunction(func);
         }
         return output;
     }
 
-    private serializeFunction(func: FunctionCompiler): string {
+    private serializeFunction(func: FunctionBytecode): string {
         let block = '.def\n';
         block += `.argc ${func.arity}\n`;
-        block += `.locals ${func.locals.length - func.arity}\n`;
+        block += `.locals ${func.localsCount}\n`;
         block += `.name ${func.name}\n`;
+
+        const parentLocalUpvalues = func.upvalues.filter(uv => uv.isLocal).map(uv => uv.index);
+        if (parentLocalUpvalues.length > 0) {
+            block += `.parent_local ${parentLocalUpvalues.join(' ')}\n`;
+        }
+
+        if (func.constants.length > 0) {
         block += '.constants\n';
         func.constants.forEach(c => {
             if (typeof c === 'number') block += `number ${c}\n`;
-            else if (typeof c === 'string') block += `string "${c}"\n`;
+                else if (typeof c === 'string') block += `string ${c}\n`;
         });
+        }
+        
         block += '.code\n';
         block += func.instructions.map(instr => {
-            return instr.text.endsWith(':') 
-                ? instr.text 
-                : `${instr.line} ${instr.text}`;
+            if (instr.line === 0) return instr.text; // Label
+            return `${instr.line} ${instr.text}`;
         }).join('\n');
+        block += '\n.end_def';
         return block;
-    }
-    
-    private visit(node: any): void {
-        if (!node) return;
-        const line = node.line || 1;
-        const C = this.currentCompiler!;
-
-        switch (node.type) {
-            case 'Program': node.body.forEach((s: any) => this.visit(s)); break;
-            case 'BlockStatement': node.body.forEach((s: any) => this.visit(s)); break;
-            case 'ExpressionStatement':
-                this.visit(node.expression);
-                C.emit('pop', line);
-                break;
-            case 'VariableDeclaration':
-                const decl = node.declarations[0];
-                if (decl.init) this.visit(decl.init);
-                C.emit(`set_local ${C.addLocal(decl.id.name)}`, line);
-                break;
-            case 'ReturnStatement':
-                this.visit(node.argument);
-                C.emit('return', line);
-                break;
-            case 'IfStatement':
-                const elseLabel = C.createLabel('endif');
-                const endLabel = C.createLabel('end');
-                this.visit(node.test);
-                C.emit(`jmp_false ${elseLabel}`, line);
-                this.visit(node.consequent);
-                if (node.alternate) C.emit(`jmp ${endLabel}`, line);
-                C.emit(`${elseLabel}:`, line);
-                if (node.alternate) this.visit(node.alternate);
-                if (node.alternate) C.emit(`${endLabel}:`, line);
-                break;
-            case 'ForStatement':
-                const forcond = C.createLabel('forcond');
-                const forblock = C.createLabel('forblock');
-                const foraction = C.createLabel('foraction');
-                const forend = C.createLabel('forend');
-                if (node.init) this.visit(node.init);
-                C.emit(`${forcond}:`, line);
-                this.visit(node.test);
-                C.emit(`jmp_false ${forend}`, line);
-                C.emit(`jmp ${forblock}`, line);
-                C.emit(`${foraction}:`, line);
-                if (node.update) {
-                    if (node.update.type === 'AssignmentExpression' && node.update.right.type === 'BinaryExpression' && node.update.right.operator === '+' && node.update.right.right.value === 1) {
-                         const idx = C.locals.indexOf(node.update.left.name);
-                         if (idx > -1) C.emit(`inc_local ${idx}`, line);
-                         this.visit(node.update.left); // get the value back for popping
-                    } else {
-                        this.visit(node.update);
-                    }
-                    C.emit('pop', line);
-                }
-                C.emit(`jmp ${forcond}`, line);
-                C.emit(`${forblock}:`, line);
-                this.visit(node.body);
-                C.emit(`jmp ${foraction}`, line);
-                C.emit(`${forend}:`, line);
-                break;
-            case 'AssignmentExpression':
-                const left = node.left;
-                if (left.type === 'Identifier') {
-                    this.visit(node.right);
-                    const res = C.locals.indexOf(left.name);
-                    if (res > -1) {
-                        C.emit(`set_local ${res}`, line);
-                        C.emit(`get_local ${res}`, line);
-                    }
-                } else if (left.type === 'MemberExpression') {
-                    this.visit(node.right);
-                    this.visit(left.object);
-                    this.visit(left.property);
-                    C.emit(`set_el`, line);
-                    this.visit(left.object);
-                    this.visit(left.property);
-                    C.emit(`get_el`, line);
-                }
-                break;
-            case 'BinaryExpression': this.visit(node.left); this.visit(node.right); this.emitBinaryOp(node.operator, line); break;
-            case 'CallExpression':
-                node.arguments.forEach((arg: any) => this.visit(arg));
-                this.visit(node.callee);
-                C.emit('call', line);
-                break;
-            case 'Identifier':
-                const res = C.resolveVariable(node.name);
-                if (res.type === 'local') {
-                    C.emit(`get_local ${res.index}`, line);
-                } else {
-                    const funcIndex = this.userFunctionNames.indexOf(node.name);
-                    if (funcIndex > -1) {
-                        C.emit(`load_fn ${funcIndex + 1}`, line);
-                    } else {
-                        C.emit(`get_global ${res.index}`, line);
-                    }
-                }
-                break;
-            case 'MemberExpression':
-                this.visit(node.object);
-                this.visit(node.property);
-                C.emit(`get_el`, line);
-                break;
-            case 'ArrayExpression':
-                node.elements.forEach((el: any) => this.visit(el));
-                C.emit(`create_arr ${node.elements.length}`, line);
-                break;
-            case 'NumericLiteral': C.emit(`const ${C.addConstant(node.value)}`, line); break;
-            case 'StringLiteral': C.emit(`const ${C.addConstant(node.value)}`, line); break;
-            case 'UnaryExpression':
-                this.visit(node.argument);
-                if (node.operator === '-') C.emit('neg', line);
-                break;
-            default: throw new Error(`Генерация кода не реализована для узла типа: ${node.type}`);
-        }
-    }
-
-    private emitBinaryOp(op: string, line: number) {
-        const map: { [k: string]: string } = { '+': 'add', '-': 'sub', '*': 'mul', '/': 'div', '%': 'mod', '==': 'ceq', '>': 'cgt', '<': 'clt' };
-        if (map[op]) this.currentCompiler!.emit(map[op], line);
-        else throw new Error(`Неизвестный оператор: ${op}`);
     }
 } 

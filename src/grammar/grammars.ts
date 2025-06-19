@@ -55,6 +55,8 @@ export const fullGrammar = [
     "<AddExpr> -> <MulExpr> - <AddExpr>",
     "<AddExpr> -> <MulExpr>",
     "<MulExpr> -> <Factor> * <MulExpr>",
+    "<MulExpr> -> <Factor> / <MulExpr>",
+    "<MulExpr> -> <Factor> % <MulExpr>",
     "<MulExpr> -> <Factor>",
     "<Factor> -> - <Factor>",
     "<Factor> -> id",

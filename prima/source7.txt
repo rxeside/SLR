@@ -1,16 +1,16 @@
-const a: array = [123, 2, 19];
+const a = [123, 2, 19];
 
-function bubbleSort(arr: array): array
+function bubbleSort(arr)
 {
-    const size: number = arrayLength(arr);
+    const size = arrayLength(arr);
 
-    for (var i: number = 0; i < size; i++)
+    for (var i = 0; i < size; i++)
     {
-        for (var j: number = 0; j < size - i - 1; j++)
+        for (var j = 0; j < size - i - 1; j++)
         {
             if (arr[j] > arr[j + 1])
             {
-                var temp: number = arr[j];
+                var temp = arr[j];
                 arr[j] = arr[j + 1];
                 arr[j + 1] = temp;
             }

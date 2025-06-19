@@ -124,8 +124,8 @@ class ASTBuilder {
                 const nameToken = children[0] as Token;
                 const argsNode = children[2] as ArgList | undefined;
                 const args = argsNode ? argsNode.args : [];
-                const funcName = nameToken.value;
-                return new CallExpr(funcName, args);
+                const funcIdentifier = new Identifier(nameToken.value);
+                return new CallExpr(funcIdentifier, args);
             }
             case 'FunctionDeclaration': {
                 const nameToken = children[1] as Token;
@@ -193,10 +193,10 @@ class ASTBuilder {
                         case TT.IDENTIFIER:
                             // Rule: <Factor> -> id or <Factor> -> id ( <Args> )
                             if (children.length > 1 && isToken(children[1]) && children[1].type === TT.PUNCT_LPAREN) {
-                                const callee = first.value;
+                                const calleeIdentifier = new Identifier(first.value);
                                 const argsNode = children[2] as ArgList | undefined;
                                 const args = argsNode ? argsNode.args : [];
-                                return new CallExpr(callee, args);
+                                return new CallExpr(calleeIdentifier, args);
                             }
                             return new Identifier(first.value);
 
@@ -204,7 +204,7 @@ class ASTBuilder {
                             // Rule: <Factor> -> ( <Expression> )
                             return children[1] as ASTNode;
 
-                        case TT.PUNCT_MINUS:
+                        case TT.OP_MINUS:
                             // Rule: <Factor> -> - <Factor>
                             return new UnaryExpr('-', children[1] as ASTNode);
 

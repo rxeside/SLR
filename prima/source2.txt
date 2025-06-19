@@ -1,6 +1,6 @@
-const a: string = "Hello";
-const b: string = "World";
-const c: number = 3;
+const a = "Hello";
+const b = "World";
+const c = 3;
 
 if (c == 4)
 {

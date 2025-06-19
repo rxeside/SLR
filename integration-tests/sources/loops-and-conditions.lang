@@ -1,0 +1,23 @@
+
+            function isPrime(n: num): num {
+                if (n <= 1) {
+                    return 0;
+                }
+                let i: num = 2;
+                while (i * i <= n) {
+                    if (n % i == 0) {
+                        return 0;
+                    }
+                    i = i + 1;
+                }
+                return 1;
+            }
+
+            let i: num = 1;
+            while(i <= 10) {
+                if(isPrime(i)) {
+                    println(i);
+                }
+                i = i + 1;
+            }
+        

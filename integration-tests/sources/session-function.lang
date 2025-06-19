@@ -1,0 +1,9 @@
+
+            let a: num = 1;
+            let c: num = 3;
+            function addA(b: num) : num
+            {
+                return b + a + c;
+            }
+            println(addA(2));
+        

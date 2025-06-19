@@ -1,6 +1,6 @@
 import { Lexer } from '../../lexer/lexer';
 import { SLRParser } from '../../slr/slr';
-import { fullGrammar } from '../../../integration-tests/grammars';
+import { fullGrammar } from '../../grammar/grammars';
 import { Program } from '../../ast/entity';
 import { CodeGenerator } from '../generator';
 import { SemanticAnalyzer } from '../../analyzer/analyzer';

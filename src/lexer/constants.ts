@@ -10,29 +10,14 @@ const TT = {
     KEYWORD_ELSE: 'else',
     KEYWORD_WHILE: 'while',
     KEYWORD_RETURN: 'return',
+    KEYWORD_FOR: 'for',
     KEYWORD_BOOL: 'bool',
     KEYWORD_NUM: 'num',
     KEYWORD_STRING_TYPE: 'string',
     KEYWORD_TRUE: 'true',
     KEYWORD_FALSE: 'false',
     KEYWORD_VOID: 'void',
-
-    UNKNOWN: 'UNKNOWN',
-
-    // Punctuators
-    PUNCT_LPAREN: '(',
-    PUNCT_RPAREN: ')',
-    PUNCT_LBRACE: '{',
-    PUNCT_RBRACE: '}',
-    PUNCT_LBRACKET: '[',
-    PUNCT_RBRACKET: ']',
-    PUNCT_COMMA: ',',
-    PUNCT_COLON: ':',
-    PUNCT_SEMICOLON: ';',
-    PUNCT_PLUS: '+',
-    PUNCT_MINUS: '-',
-    PUNCT_MUL: '*',
-    PUNCT_DIV: '/',
+    KEYWORD_ANY: 'any',
 
     // Operators
     OP_ASSIGN: '=',
@@ -45,13 +30,22 @@ const TT = {
     OP_AND: '&&',
     OP_OR: '||',
     OP_NOT: '!',
+    OP_PLUS: '+',
+    OP_MINUS: '-',
+    OP_MUL: '*',
+    OP_DIV: '/',
+    OP_MOD: '%',
 
-    // backward compatibility for tests
-    OPERATOR_PLUS: '+',
-    OPERATOR_MINUS: '-',
-    OPERATOR_MULTIPLY: '*',
-    OPERATOR_DIVIDE: '/',
-    OPERATOR_ASSIGN: '=',
+    // Punctuators
+    PUNCT_LPAREN: '(',
+    PUNCT_RPAREN: ')',
+    PUNCT_LBRACE: '{',
+    PUNCT_RBRACE: '}',
+    PUNCT_LBRACKET: '[',
+    PUNCT_RBRACKET: ']',
+    PUNCT_COMMA: ',',
+    PUNCT_COLON: ':',
+    PUNCT_SEMICOLON: ';',
 
     // Literals & Identifiers
     IDENTIFIER: 'id',
@@ -59,14 +53,16 @@ const TT = {
     STRING: 'string',
 
     // Misc
+    UNKNOWN: 'UNKNOWN',
     EOF: EOF_SYMBOL,
     NULL: null,
 };
 
 const tokenSpecifications: [RegExp, string | null][] = [
-    [/^\s+/, null], // Пробелы
-    [/^\/\/.*/, null], // Комментарии
-    [/^\n/, null], // Новая строка
+    // Ignored
+    [/^\s+/, null],
+    [/^\/\/.*/, null],
+    [/^\/\*[\s\S]*?\*\//, null],
 
     // Punctuators
     [/^\(/, TT.PUNCT_LPAREN],
@@ -88,15 +84,19 @@ const tokenSpecifications: [RegExp, string | null][] = [
     [/^\|\|/, TT.OP_OR],
     [/^!/, TT.OP_NOT],
     [/^=/, TT.OP_ASSIGN],
-    [/^\+/, TT.PUNCT_PLUS],
-    [/^-/, TT.PUNCT_MINUS],
-    [/^\*/, TT.PUNCT_MUL],
-    [/^\//, TT.PUNCT_DIV],
+    [/^\+/, TT.OP_PLUS],
+    [/^-/, TT.OP_MINUS],
+    [/^\*/, TT.OP_MUL],
+    [/^\//, TT.OP_DIV],
+    [/^%/, TT.OP_MOD],
     [/^</, TT.OP_LT],
     [/^>/, TT.OP_GT],
     
+    // Literals
     [/^\d+/, TT.NUMBER],
     [/^"[^"]*"/, TT.STRING],
+
+    // Identifiers (should be last)
     [/^[a-zA-Z_][a-zA-Z0-9_]*/, TT.IDENTIFIER],
 ];
 

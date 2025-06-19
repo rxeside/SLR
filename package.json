@@ -7,7 +7,7 @@
         "test:watch": "jest --watch",
         "run-compiler": "npx ts-node -r tsconfig-paths/register",
         "build": "tsc",
-        "compile": "ts-node src/index.ts"
+        "compile": "npx ts-node -r tsconfig-paths/register src/index.ts"
     },
     "devDependencies": {
         "@types/graphviz": "^0.0.39",

@@ -2,7 +2,7 @@ import { SemanticAnalyzer } from '../analyzer';
 import { Program } from '../../ast/entity';
 import { Lexer } from '../../lexer/lexer';
 import { SLRParser } from '../../slr/slr';
-import { fullGrammar } from '../../../integration-tests/grammars';
+import { fullGrammar } from '../../grammar/grammars';
 import { SemanticError } from '../error';
 import { SymbolTable } from '../../symbolTable/symbolTable';
 

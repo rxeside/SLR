@@ -1,8 +1,8 @@
-const a: number = 1;
-const b: number = 2;
-const c: number = 3;
+const a = 1;
+const b = 2;
+const c = 3;
 
-function addA(b: number): number
+function addA(b)
 {
     return b + a + c;
 }

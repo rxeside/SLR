@@ -1,0 +1,37 @@
+.def
+.argc 0
+.locals 2
+.name __EntryPoint__
+.constants
+number 1
+number 3
+number 2
+string println
+.code
+1 const 0
+1 set_local 0
+1 const 1
+1 set_local 1
+1 const 2
+1 load_fn 1
+1 call 1
+1 get_global 3
+1 call 1
+1 return
+.end_def
+
+.def
+.argc 1
+.locals 0
+.name addA
+.constants
+string a
+string c
+.code
+1 get_local 0
+1 get_global 0
+1 get_global 1
+1 add
+1 add
+1 return
+.end_def
