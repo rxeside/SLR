@@ -49,7 +49,10 @@ export class CodeGenerator {
     }
 
     private visitBlock(node: Block): string {
-        return `{\n${node.statements.map(stmt => this.visit(stmt)).join(';\n')}\n}`;
+        const statements = node.statements
+            .map(stmt => this.visit(stmt))
+            .join(';\n');
+        return `{\n${statements}\n}`;
     }
 
     private visitVarDecl(node: VarDecl): string {
@@ -105,6 +108,10 @@ export class CodeGenerator {
     }
 
     private visitCallExpr(node: CallExpr): string {
+        if (node.callee === 'print') {
+            const arg = this.visit(node.args[0]);
+            return `console.log(${arg})`;
+        }
         const args = node.args.map(arg => this.visit(arg)).join(', ');
         return `${node.callee}(${args})`;
     }

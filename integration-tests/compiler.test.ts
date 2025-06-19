@@ -1,6 +1,6 @@
 import { Lexer } from '../src/lexer/lexer';
 import { SLRParser } from '../src/slr/slr';
-import { Program, VarDecl, Literal, IfStmt, Block, BinaryExpr, Identifier, WhileStmt, CallExpr, ArrayLiteral, ArrayAccess } from '../src/ast/entity';
+import { Program, VarDecl, Literal, IfStmt, Block, BinaryExpr, Identifier, WhileStmt, CallExpr, ArrayLiteral, ArrayAccess, FuncDecl } from '../src/ast/entity';
 import { fullGrammar } from './grammars';
 import { ErrorHandler } from '../src/error/error';
 
@@ -182,5 +182,29 @@ describe('Compiler Integration Tests', () => {
         const arrayAccess = varDecl.initializer as ArrayAccess;
         expect(arrayAccess.array).toMatchObject({ name: 'myArray' });
         expect(arrayAccess.index).toMatchObject({ value: 0 });
+    });
+
+    test('should correctly parse a nested function declaration', () => {
+        const input = `
+            function outer(): void {
+                function inner(): void {}
+            }
+        `;
+        const program = parseWithNoErrors(input);
+
+        // Check for the outer function
+        expect(program.statements).toHaveLength(1);
+        const outerFunc = program.statements[0] as FuncDecl;
+        expect(outerFunc).toBeInstanceOf(FuncDecl);
+        expect(outerFunc.name).toBe('outer');
+
+        // Check the body of the outer function
+        expect(outerFunc.body).toBeInstanceOf(Block);
+        expect(outerFunc.body.statements).toHaveLength(1);
+
+        // Check for the inner function inside the outer function's body
+        const innerFunc = outerFunc.body.statements[0] as FuncDecl;
+        expect(innerFunc).toBeInstanceOf(FuncDecl);
+        expect(innerFunc.name).toBe('inner');
     });
 }); 

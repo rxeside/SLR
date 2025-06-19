@@ -5,11 +5,15 @@ import { ErrorHandler, ErrorType } from '../error/error';
 export class SemanticAnalyzer {
     private symbolTable: SymbolTable;
     private errorHandler: ErrorHandler;
-    private currentFunction: SymbolEntry | null = null;
+    private functionStack: SymbolEntry[] = [];
 
     constructor(symbolTable: SymbolTable, errorHandler?: ErrorHandler) {
         this.symbolTable = symbolTable;
         this.errorHandler = errorHandler;
+    }
+
+    private get currentFunction(): SymbolEntry | null {
+        return this.functionStack.length > 0 ? this.functionStack[this.functionStack.length - 1] : null;
     }
 
     public analyze(ast: Program): void {
@@ -48,15 +52,16 @@ export class SemanticAnalyzer {
     }
 
     private visitVarDecl(node: VarDecl): void {
+        const success = this.symbolTable.add(node.name, node.type);
+        if (!success) {
+            this.errorHandler?.addError(`Symbol '${node.name}' already declared in the current scope`, node.line, node.column, ErrorType.Semantic);
+        }
+
         if (node.initializer) {
             const initializerType = this.visit(node.initializer);
             if (initializerType !== node.type) {
-                this.errorHandler.addError(`Type mismatch: cannot assign '${initializerType}' to '${node.type}'`, node.line, node.column, ErrorType.Semantic);
+                this.errorHandler?.addError(`Type mismatch: cannot assign '${initializerType}' to '${node.type}'`, node.line, node.column, ErrorType.Semantic);
             }
-        }
-        const success = this.symbolTable.add(node.name, node.type);
-        if (!success) {
-            this.errorHandler.addError(`Symbol '${node.name}' already declared in the current scope`, node.line, node.column, ErrorType.Semantic);
         }
     }
 
@@ -64,17 +69,25 @@ export class SemanticAnalyzer {
         const paramTypes = node.params.map(p => p.type);
         const funcEntry = this.symbolTable.add(node.name, 'function', undefined, true, paramTypes, node.returnType, true);
         if (!funcEntry) {
-            this.errorHandler.addError(`Function '${node.name}' already declared.`, node.line, node.column, ErrorType.Semantic);
+            this.errorHandler?.addError(`Function '${node.name}' already declared.`, node.line, node.column, ErrorType.Semantic);
             return;
         }
-        this.currentFunction = funcEntry;
+        this.functionStack.push(funcEntry);
         this.symbolTable.enterScope();
         for (const param of node.params) {
             this.symbolTable.add(param.name, param.type);
         }
-        this.visit(node.body);
+        
+        // Directly visit statements in the function body block
+        // to avoid creating an extra scope layer from visitBlock.
+        if (node.body && node.body.statements) {
+            for (const statement of node.body.statements) {
+                this.visit(statement);
+            }
+        }
+
         this.symbolTable.exitScope();
-        this.currentFunction = null;
+        this.functionStack.pop();
     }
 
     private visitBlock(node: Block): void {
@@ -90,13 +103,17 @@ export class SemanticAnalyzer {
         const targetType = this.visit(node.target);
 
         if (targetType !== valueType) {
-            this.errorHandler.addError(`Type mismatch: cannot assign '${valueType}' to '${targetType}'`, node.line, node.column, ErrorType.Semantic);
+            this.errorHandler?.addError(`Type mismatch: cannot assign '${valueType}' to '${targetType}'`, node.line, node.column, ErrorType.Semantic);
         }
     }
 
     private visitBinaryExpr(node: BinaryExpr): string | null {
         const leftType = this.visit(node.left);
         const rightType = this.visit(node.right);
+
+        if (!leftType || !rightType) {
+            return null; // Stop analysis for this branch if children have errors
+        }
 
         switch (node.operator) {
             case '+':
@@ -122,6 +139,15 @@ export class SemanticAnalyzer {
     }
 
     private visitCallExpr(node: CallExpr): string | null {
+        if (node.callee === 'print') {
+            if (node.args.length !== 1) {
+                this.errorHandler.addError(`Function 'print' expects 1 argument, but received ${node.args.length}`, node.line, node.column, ErrorType.Semantic);
+            } else {
+                this.visit(node.args[0]); // Analyze the argument
+            }
+            return 'void';
+        }
+
         const symbol = this.symbolTable.lookup(node.callee);
         if (!symbol || !symbol.isFunction) {
             this.errorHandler.addError(`Function '${node.callee}' not found or not a function`, node.line, node.column, ErrorType.Semantic);
@@ -209,7 +235,7 @@ export class SemanticAnalyzer {
     private visitIfStmt(node: IfStmt): void {
         const conditionType = this.visit(node.condition);
         if (conditionType !== 'bool') {
-            this.errorHandler.addError(`If statement condition must be a boolean, but got '${conditionType}'`, node.line, node.column, ErrorType.Semantic);
+            this.errorHandler?.addError(`If statement condition must be a boolean, but got '${conditionType}'`, node.line, node.column, ErrorType.Semantic);
         }
         this.visit(node.thenBranch);
         if (node.elseBranch) {
@@ -220,7 +246,7 @@ export class SemanticAnalyzer {
     private visitWhileStmt(node: WhileStmt): void {
         const conditionType = this.visit(node.condition);
         if (conditionType !== 'bool') {
-            this.errorHandler.addError(`While statement condition must be a boolean, but got '${conditionType}'`, node.line, node.column, ErrorType.Semantic);
+            this.errorHandler?.addError(`While statement condition must be a boolean, but got '${conditionType}'`, node.line, node.column, ErrorType.Semantic);
         }
         this.visit(node.body);
     }

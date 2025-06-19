@@ -45,9 +45,6 @@ export class SymbolTable {
     }
 
     exitScope(): boolean {
-        if (this.currentScope === this.globalScope) {
-            return false;
-        }
         if (this.currentScope.parent) {
             this.currentScope = this.currentScope.parent;
             return true;
@@ -108,21 +105,14 @@ export class SymbolTable {
 
     lookup(name: string): SymbolEntry | undefined {
         // Сначала ищем в текущей области видимости
-        const entry = this.currentScope.symbols.get(name);
-        if (entry) {
-            return entry;
-        }
-
-        // Если не нашли и есть родительская область, ищем рекурсивно вверх по цепочке
-        let scope = this.currentScope.parent;
+        let scope: Scope | null = this.currentScope;
         while (scope) {
-            const parentEntry = scope.symbols.get(name);
-            if (parentEntry) {
-                return parentEntry;
+            const entry = scope.symbols.get(name);
+            if (entry) {
+                return entry;
             }
             scope = scope.parent;
         }
-
         return undefined;
     }
 

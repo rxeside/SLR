@@ -136,7 +136,7 @@ class ASTBuilder {
             case 'FunctionCall': { // id ( <Args> ) ;
                 const nameToken = children[0] as Token;
                 const argsNode = children[2] as ArgList | undefined;
-                const args = argsNode ? argsNode.args : [];
+                const args = (argsNode && argsNode.args) ? argsNode.args : [];
                 const funcName = nameToken.value;
                 return new CallExpr(funcName, args, pos.line, pos.column);
             }
@@ -208,7 +208,7 @@ class ASTBuilder {
                             if (children.length > 1 && isToken(children[1]) && children[1].type === TT.PUNCT_LPAREN) {
                                 const callee = first.value;
                                 const argsNode = children[2] as ArgList | undefined;
-                                const args = argsNode ? argsNode.args : [];
+                                const args = (argsNode && argsNode.args) ? argsNode.args : [];
                                 return new CallExpr(callee, args, first.line, first.column);
                             }
                             return new Identifier(first.value, first.line, first.column);
