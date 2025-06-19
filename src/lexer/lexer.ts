@@ -1,393 +1,105 @@
-import {Lexeme, Token} from '@common/types'
+import { EOF_SYMBOL, TT, tokenSpecifications } from "./constants";
+import { Token } from "./type";
+import { ErrorHandler, ErrorType } from "../error/error";
 
-function getKeyword(value: string): Lexeme | undefined {
-    const keywords = [
-        Lexeme.IF,
-        Lexeme.THEN,
-        Lexeme.ELSE,
-        Lexeme.OR,
-        Lexeme.AND,
-        Lexeme.THEN,
-        Lexeme.DIV,
-        Lexeme.MOD,
-        Lexeme.NOT,
-        Lexeme.TRUE,
-        Lexeme.FALSE,
-    ]
+const keywords = new Set([
+    TT.KEYWORD_LET, TT.KEYWORD_CONST, TT.KEYWORD_FUNCTION, TT.KEYWORD_IF, TT.KEYWORD_ELSE,
+    TT.KEYWORD_WHILE, TT.KEYWORD_RETURN, TT.KEYWORD_BOOL, TT.KEYWORD_NUM, TT.KEYWORD_STRING_TYPE,
+    TT.KEYWORD_TRUE, TT.KEYWORD_FALSE, TT.KEYWORD_VOID
+]);
 
-    return keywords.find(keyword => keyword === value.toUpperCase()) as Lexeme | undefined
-}
+export class Lexer {
+    private input: string = "";
+    private cursor: number = 0;
+    private line: number = 1;
+    private column: number = 1;
+    private errorHandler?: ErrorHandler;
 
-class Lexer {
-    private text: string = ''
-    private pos: number = 0
-    private currentChar: string | null = null
-    private line: number = 1
-    private column: number = 0
+    public tokenize(input: string, errorHandler?: ErrorHandler): Token[] {
+        this.input = input;
+        this.cursor = 0;
+        this.line = 1;
+        this.column = 1;
+        this.errorHandler = errorHandler;
+        const tokens: Token[] = [];
 
-    constructor() {
-    }
-
-    public tokenize(text: string): Token[] {
-        this.reset()
-        this.text = text
-        this.currentChar = this.text[this.pos] || null
-
-        const tokens: Token[] = []
-        let token: Token | null
-        do {
-            token = this.nextToken()
-            if (token) tokens.push(token)
-        } while (token && token.type !== Lexeme.GRID)
-        return tokens
-    }
-
-    private reset(): void {
-        this.text = ''
-        this.pos = 0
-        this.currentChar = null
-        this.line = 1
-        this.column = 0
-    }
-
-    private advance(): void {
-        if (this.currentChar === '\n') {
-            this.line++
-            this.column = 0
-        } else {
-            this.column++
-        }
-        this.pos++
-        this.currentChar = this.pos < this.text.length ? this.text[this.pos] : null
-    }
-
-    private peek(): string | null {
-        return this.pos + 1 < this.text.length ? this.text[this.pos + 1] : null
-    }
-
-    private skipWhitespace(): void {
-        while (this.currentChar && /\s/.test(this.currentChar)) {
-            this.advance()
-        }
-    }
-
-    private skipComment(): Token | null {
-        const startLine = this.line
-        const startColumn = this.column
-        let result = ''
-
-        if (this.currentChar === '/' && this.peek() === '/') {
-            while (this.currentChar && this.currentChar !== ('\n' as string)) {
-                result += this.currentChar
-                this.advance()
+        while (this.cursor < this.input.length) {
+            const token = this.getNextToken();
+            if (token) {
+                tokens.push(token);
             }
-            return new Token(
-                Lexeme.LINE_COMMENT,
-                result,
-                {line: startLine, column: startColumn},
-            )
-        } else if (this.currentChar === '{') {
-            result += this.currentChar
-            this.advance()
-
-            while (this.currentChar && this.currentChar !== ('}' as string)) {
-                result += this.currentChar
-                this.advance()
-            }
-
-            if (this.currentChar === ('}' as string)) {
-                result += this.currentChar
-                this.advance()
-            } else {
-                return new Token(
-                    Lexeme.ERROR,
-                    result,
-                    {line: startLine, column: startColumn},
-                )
-            }
-
-            return new Token(
-                Lexeme.BLOCK_COMMENT,
-                result,
-                {line: startLine, column: startColumn},
-            )
         }
 
-        return null
+        // Добавляем токен конца файла
+        tokens.push({
+            type: TT.EOF,
+            value: EOF_SYMBOL,
+            line: this.line,
+            column: this.column
+        });
+
+        return tokens;
     }
 
-    private number(): Token {
-        const startColumn = this.column
-        const startLine = this.line
-        let result = ''
-        let isFloat = false
-        let dotCount = 0
-
-        while (this.currentChar && /\d/.test(this.currentChar)) {
-            result += this.currentChar
-            this.advance()
+    private getNextToken(): Token | null {
+        if (this.cursor >= this.input.length) {
+            return null; // Достигнут конец строки
         }
 
-        if (this.currentChar === '.' && this.peek() === '.') {
-            return new Token(
-                Lexeme.INTEGER,
-                result,
-                {line: startLine, column: startColumn}
-            )
-        }
+        const stringToMatch = this.input.substring(this.cursor);
 
-        if (this.currentChar === '.') {
-            while (this.currentChar === '.') {
-                result += this.currentChar
-                dotCount++
-                this.advance()
-            }
-            if (dotCount > 1 || !/\d/.test(this.currentChar || '')) {
-                while (this.currentChar && /[a-zA-Z\d.]/.test(this.currentChar)) {
-                    result += this.currentChar
-                    this.advance()
+        for (const [regex, initialType] of tokenSpecifications) {
+            const match = regex.exec(stringToMatch);
+
+            if (match && match.index === 0) { // Убедимся, что совпадение с начала строки
+                const value = match[0];
+                let tokenType = initialType;
+                const startLine = this.line;
+                const startColumn = this.column;
+
+                // Обновляем позицию курсора, строки и колонки
+                this.cursor += value.length;
+                const linesInValue = value.split('\n');
+                if (linesInValue.length > 1) {
+                    this.line += linesInValue.length - 1;
+                    this.column = linesInValue[linesInValue.length - 1].length + 1;
+                } else {
+                    this.column += value.length;
                 }
-                return new Token(
-                    Lexeme.ERROR,
-                    result,
-                    {line: startLine, column: startColumn},
-                )
-            }
-            isFloat = true
 
-            while (this.currentChar && /\d/.test(this.currentChar)) {
-                result += this.currentChar
-                this.advance()
+                if (tokenType === TT.IDENTIFIER) {
+                    if (keywords.has(value)) {
+                        tokenType = value;
+                    }
+                }
+
+                if (tokenType === null) { // Игнорируемый токен (пробел, комментарий)
+                    return this.getNextToken(); // Рекурсивно получаем следующий значащий токен
+                }
+
+                return {
+                    type: tokenType,
+                    value: value,
+                    line: startLine,
+                    column: startColumn
+                };
             }
         }
 
-        if (this.currentChar?.toLowerCase() === 'e') {
-            result += this.currentChar
-            this.advance()
+        // Если ни одно правило не подошло
+        const unknownChar = stringToMatch[0];
+        const errorToken: Token = {
+            type: TT.UNKNOWN,
+            value: unknownChar,
+            line: this.line,
+            column: this.column
+        };
 
-            if (this.currentChar === '+' || this.currentChar === '-') {
-                result += this.currentChar
-                this.advance()
-            }
+        // Пропускаем неизвестный символ, чтобы избежать бесконечного цикла
+        this.cursor++;
+        this.column++;
 
-            if (!/\d/.test(this.currentChar || '')) {
-                return new Token(
-                    Lexeme.ERROR,
-                    result,
-                    {line: startLine, column: startColumn},
-                )
-            }
-
-            while (this.currentChar && /\d/.test(this.currentChar)) {
-                result += this.currentChar
-                this.advance()
-            }
-
-            isFloat = true
-        }
-
-        if (this.currentChar === '.') {
-            while (this.currentChar && this.currentChar !== ('\n' as string) && this.currentChar !== (' ' as string)) {
-                result += this.currentChar
-                this.advance()
-            }
-            return new Token(
-                Lexeme.ERROR,
-                result,
-                {line: startLine, column: startColumn},
-            )
-        }
-
-        if (/[a-zA-Z_а-яА-Я]/.test(this.currentChar || '')) {
-            while (this.currentChar && !/\s/.test(this.currentChar)) {
-                result += this.currentChar
-                this.advance()
-            }
-            return new Token(
-                Lexeme.ERROR,
-                result,
-               {line: startLine, column: startColumn},
-            )
-        }
-
-        return new Token(
-            isFloat ? Lexeme.FLOAT : Lexeme.INTEGER,
-            result,
-            {line: startLine, column: startColumn},
-        )
+        this.errorHandler?.addError(`Неизвестный токен: '${unknownChar}'`, this.line, this.column -1, ErrorType.Lexical);
+        return errorToken;
     }
-
-    private identifierOrInvalid(): Token {
-        const startColumn = this.column
-        const startLine = this.line
-        let result = ''
-
-        while (this.currentChar && /[a-zA-Z0-9_а-яА-Я]/.test(this.currentChar)) {
-            result += this.currentChar
-            this.advance()
-        }
-
-        if (/[а-яА-Я]/.test(result)) {
-            return new Token(
-                Lexeme.ERROR,
-                result,
-                {line: startLine, column: startColumn},
-            )
-        }
-
-        const keyword = getKeyword(result)
-        if (keyword) {
-            return new Token(
-                keyword,
-                result,
-                {line: startLine, column: startColumn},
-            )
-        }
-
-        return new Token(
-            Lexeme.IDENTIFIER,
-            result,
-            {line: startLine, column: startColumn},
-        )
-    }
-
-    private string(): Token {
-        const startColumn = this.column
-        const startLine = this.line
-        let result = ''
-
-        this.advance()
-        while (this.currentChar && this.currentChar !== '"' && this.currentChar !== '\n') {
-            result += this.currentChar
-            this.advance()
-        }
-
-        if (this.currentChar === '"') {
-            this.advance()
-            return new Token(
-                Lexeme.STRING,
-                `${result}`,
-                {line: startLine, column: startColumn},
-            )
-        }
-
-        return new Token(
-            Lexeme.ERROR,
-            result,
-            {line: startLine, column: startColumn},
-        )
-    }
-
-    private operatorOrPunctuation(): Token {
-        const startColumn = this.column
-        const startLine = this.line
-        const char = this.currentChar
-
-        if (char === '=' && this.peek() === '=') {
-            this.advance()
-            this.advance()
-            return new Token(
-                Lexeme.DOUBLE_EQ,
-                '==',
-                {line: startLine, column: startColumn},
-            )
-        }
-        if (char === '!' && this.peek() === '=') {
-            this.advance()
-            this.advance()
-            return new Token(
-                Lexeme.NOT_EQ,
-                '!=',
-                {line: startLine, column: startColumn},
-            )
-        }
-        if (char === '>' && this.peek() === '=') {
-            this.advance()
-            this.advance()
-            return new Token(
-                Lexeme.GREATER_EQ,
-                '>=',
-                {line: startLine, column: startColumn},
-            )
-        }
-        if (char === '<' && this.peek() === '=') {
-            this.advance()
-            this.advance()
-            return new Token(
-                Lexeme.LESS_EQ,
-                '<=',
-                {line: startLine, column: startColumn},
-            )
-        }
-
-        const singleCharOperators: Record<string, Lexeme> = {
-            '*': Lexeme.MULTIPLICATION,
-            '+': Lexeme.PLUS,
-            '-': Lexeme.MINUS,
-            '/': Lexeme.DIVIDE,
-            ';': Lexeme.SEMICOLON,
-            ',': Lexeme.COMMA,
-            '(': Lexeme.LEFT_PAREN,
-            ')': Lexeme.RIGHT_PAREN,
-            '[': Lexeme.LEFT_BRACKET,
-            ']': Lexeme.RIGHT_BRACKET,
-            '=': Lexeme.ASSIGN,
-            '>': Lexeme.GREATER,
-            '<': Lexeme.LESS,
-            ':': Lexeme.COLON,
-            '.': Lexeme.DOT,
-            '!': Lexeme.NEGATION,
-            '#': Lexeme.GRID,
-        }
-
-        if (singleCharOperators[char]) {
-            this.advance()
-            return new Token(
-                singleCharOperators[char],
-                char,
-                {line: startLine, column: startColumn},
-            )
-        }
-
-        this.advance()
-        return new Token(
-            Lexeme.ERROR,
-            char,
-            {line: startLine, column: startColumn},
-        )
-    }
-
-    private nextToken(): Token | null {
-        while (this.currentChar) {
-            if (/\s/.test(this.currentChar)) {
-                this.skipWhitespace()
-                continue
-            }
-            if (this.currentChar === '/' && this.peek() === '/') {
-                return this.skipComment()
-            }
-            if (this.currentChar === '{') {
-                return this.skipComment()
-            }
-            if (this.currentChar === '"') {
-                return this.string()
-            }
-            if (/[a-zA-Z_а-яА-Я]/.test(this.currentChar)) {
-                return this.identifierOrInvalid()
-            }
-            if (/\d/.test(this.currentChar)) {
-                return this.number()
-            }
-            return this.operatorOrPunctuation()
-        }
-        return new Token(
-            Lexeme.GRID,
-            '#',
-            {line: this.line, column: this.column},
-        )
-    }
-}
-
-export {
-    Lexer,
 }

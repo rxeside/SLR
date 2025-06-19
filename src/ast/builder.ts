@@ -3,7 +3,6 @@ import {
     Program,
     Block,
     VarDecl,
-    ConstDecl,
     FuncDecl,
     Param,
     AssignExpr,
@@ -14,506 +13,310 @@ import {
     Identifier,
     IfStmt,
     WhileStmt,
-    ForStmt,
-} from '@src/ast/entity'
-import {GrammarRule, Token, Lexeme, Position} from '@common/types'
+    ReturnStmt,
+    ArrayLiteral,
+    ArrayAccess,
+    ParamList,
+    ArgList,
+} from './entity'
+import {GrammarRule} from '../grammar/types';
+import {TT} from '../lexer/constants';
+import {Token} from '../lexer/type';
+
+export interface Position {
+    line: number;
+    column: number;
+}
+
+// Вспомогательная функция для проверки, является ли объект токеном
+function isToken(obj: any): obj is Token {
+    return obj && typeof obj === 'object' && 'type' in obj;
+}
+
+function getFirstPosition(children: (ASTNode | Token)[]): Position {
+    for (const child of children) {
+        if (isToken(child) && child.line > 0) {
+            return { line: child.line, column: child.column };
+        }
+        if (child instanceof ASTNode && child.line > 0) {
+            return { line: child.line, column: child.column };
+        }
+    }
+    return DUMMY_POS;
+}
+
+// Константа для позиции по умолчанию
+const DUMMY_POS: Position = { line: 0, column: 0 };
 
 class ASTBuilder {
     static buildNode(actionName: string, children: (ASTNode | Token)[], rule: GrammarRule): ASTNode {
-        console.log(`ASTBuilder.buildNode: action=${actionName}, правило: ${rule.left} -> ${rule.right.join(' ')}, дети=`, children.map(c => (c instanceof ASTNode ? c.constructor.name : (c as Token).lexeme)))
+        const pos = getFirstPosition(children);
+        const flatten = (arr: any[]): any[] =>
+            arr.reduce((acc, val) => Array.isArray(val) ? acc.concat(flatten(val)) : acc.concat(val), []);
 
         switch (actionName) {
-            case 'Program':
-                // Ожидаем, что Program состоит из списка выражений/инструкций.
-                // Все дочерние элементы, являющиеся ASTNode, станут частью Program.
-                // Пример правила: <Z> -> <StatementList> # ~Program
-                // children будет содержать [ASTNode_for_StatementList]
-                const programStatements = children.filter(c => c instanceof ASTNode)
-                return new Program(programStatements);
+            // Meta rules
+            case 'Program': {
+                const statements = children.flatMap(s => s instanceof Program ? s.statements : (s instanceof ASTNode ? [s] : []));
+                return new Program(statements, pos.line, pos.column);
+            }
+            case 'Block': {
+                const statements = children.flatMap(c => {
+                    if (c instanceof Block) {
+                        return c.statements;
+                    }
+                    if (c instanceof ASTNode) {
+                        return [c];
+                    }
+                    return [];
+                });
+                return new Block(statements, pos.line, pos.column);
+            }
 
-            case 'Block':
-                // Блок также состоит из списка выражений/инструкций.
-                // Пример правила: <Block> -> { <StatementList> } ~Block
-                // children может быть: [Token_for_{, ASTNode_for_StatementList, Token_for_}]
-                // или если { и } не попадают в children: [ASTNode_for_StatementList]
-                const blockStatements = children.filter(c => c instanceof ASTNode)
-                return new Block(blockStatements);
+            // Pass-through rules that just select the real node
+            case 'Statement':
+            case 'Expression':
+            case 'ArrayIndex':
+            case 'ArrayMember':
+            case 'E':
+            case 'T':
+            case 'F':
+                return children[0] as ASTNode;
 
-            case 'VarDecl':
-                // Пример правила: <VarDecl> -> var id : type ; ~VarDecl
-                // Или <VarDecl> -> var id : type = <Expression> ; ~VarDecl
-                // children могут быть:
-                // [Token_var, IdentifierNode_name, Token_colon, IdentifierNode_type, Token_semicolon]
-                // [Token_var, IdentifierNode_name, Token_colon, IdentifierNode_type, Token_eq, ASTNode_initializer, Token_semicolon]
-                // Важно: мы должны извлекать имена и типы из IdentifierNode или Token,
-                // а инициализатор - это ASTNode.
-                // Будем считать, что токены типа 'var', ':', '=', ';' отфильтровываются парсером
-                // и не попадают в `children` для `_createASTNode`, либо мы их здесь отфильтруем.
-                // Для простоты предположим, что в children приходят только нужные компоненты:
-                // [IdentifierNode_name, IdentifierNode_type] или [IdentifierNode_name, IdentifierNode_type, ASTNode_initializer]
-                // Либо, если идентификаторы для имени и типа приходят как токены:
-                // [Token_name, Token_type, (ASTNode_initializer)?]
+            case 'LogicExpr':
+            case 'EqualityExpr':
+            case 'RelExpr':
+            case 'AddExpr':
+            case 'MulExpr': {
+                if (children.length === 1) return children[0] as ASTNode;
+                const [left, op, right] = children;
+                return new BinaryExpr(left as ASTNode, (op as Token).value, right as ASTNode, pos.line, pos.column);
+            }
 
-                // Более реалистичный сценарий, если парсер передает все значимые части:
-                // Rule: <VarDecl> -> 'var' <id> ':' <type_id> ['=' <Expr>] ';' ~VarDecl
-                // Children for 'var id : type ;': [Token(var), Identifier(id), Token(:), Identifier(type), Token(;)]
-                // Children for 'var id : type = expr ;': [Token(var), Identifier(id), Token(:), Identifier(type), Token(=), ExprNode, Token(;)]
+            // Statement Rules
+            case 'BaseDeclaration':
+            case 'Declaration': { // let id : <Type> = <Expression> ;
+                const nameToken = children[1] as Token;
+                const typeNode = children[3] as Identifier; // This should be the result of the <Type> rule
+                const initializerNode = children[5] as ASTNode;
 
-                let varNameNode: Identifier | undefined;
-                let varTypeNode: Identifier | undefined; // Предполагаем, что тип тоже может быть Identifier
-                let varInitializer: ASTNode | undefined;
+                const varName = nameToken.value;
+                const varType = typeNode.name; // <Type> becomes an Identifier with the type name
 
-                let childIndex = 0;
-                // Пропускаем токен 'var', если он есть
-                if (children[childIndex] instanceof Token && (children[childIndex] as Token).lexeme === 'var') {
-                    childIndex++;
+                return new VarDecl(varName, varType, initializerNode, pos.line, pos.column);
+            }
+            case 'ReturnStatement': { // return <Expression> ;
+                return new ReturnStmt(children[1] as ASTNode, pos.line, pos.column);
+            }
+            case 'Assignment': { // id = <Expression> ; or <ArrayAccess> = <Expression> ;
+                const left = children[0];
+                const value = children[2] as ASTNode;
+
+                if (left instanceof Identifier || left instanceof ArrayAccess) {
+                    return new AssignExpr(left, value, pos.line, pos.column);
                 }
 
-                if (children[childIndex] instanceof Identifier) {
-                    varNameNode = children[childIndex] as Identifier;
-                    childIndex++;
+                if (isToken(left) && left.type === 'id') {
+                    return new AssignExpr(new Identifier(left.value, left.line, left.column), value, pos.line, pos.column);
+                }
+
+                throw new Error(`Invalid assignment target: ${JSON.stringify(left)}`);
+            }
+            case 'IfStatement': {
+                const condition = children[2] as ASTNode;
+                const thenBranch = children[5] as Block;
+                const elseBranch = children.length > 7 ? (children[9] as Block) : undefined;
+                return new IfStmt(condition, thenBranch, [], elseBranch, pos.line, pos.column);
+            }
+            case 'WhileStatement': {
+                const condition = children[2] as ASTNode;
+                const body = children[5] as Block;
+                return new WhileStmt(condition, body, pos.line, pos.column);
+            }
+            case 'FunctionCall': { // id ( <Args> ) ;
+                const nameToken = children[0] as Token;
+                const argsNode = children[2] as ArgList | undefined;
+                const args = (argsNode && argsNode.args) ? argsNode.args : [];
+                const funcName = nameToken.value;
+                return new CallExpr(funcName, args, pos.line, pos.column);
+            }
+            case 'FunctionDeclaration': {
+                const nameToken = children[1] as Token;
+
+                let paramList: Param[];
+                let returnTypeIdentifier: Identifier;
+                let body: Block;
+
+                if (children[3] instanceof ParamList) {
+                    // Has params
+                    paramList = (children[3] as ParamList).params;
+                    returnTypeIdentifier = children[6] as Identifier;
+                    body = children[8] as Block;
                 } else {
-                    throw new Error(`VarDecl: ожидался идентификатор имени переменной. Получено: ${children[childIndex]?.constructor.name}`);
+                    // No params
+                    paramList = [];
+                    returnTypeIdentifier = children[5] as Identifier;
+                    body = children[7] as Block;
                 }
 
-                // Пропускаем токен ':'
-                if (children[childIndex] instanceof Token && (children[childIndex] as Token).lexeme === ':') {
-                    childIndex++;
+                const funcName = nameToken.value;
+                const returnType = returnTypeIdentifier.name;
+
+                return new FuncDecl(funcName, paramList, returnType, body, pos.line, pos.column);
+            }
+            case 'Params': {
+                if (children.length === 0) return new ParamList([], pos.line, pos.column);
+                const name = (children[0] as Token).value;
+                const type = (children[2] as Identifier).name;
+                const thisParam = new Param(name, type);
+                const otherParams = children.length > 3 && children[3] instanceof ParamList ? (children[3] as ParamList).params : [];
+                return new ParamList([thisParam, ...otherParams], pos.line, pos.column);
+            }
+            case 'MoreParams': {
+                if (children.length === 0) return new ParamList([], pos.line, pos.column);
+                const name = (children[1] as Token).value;
+                const type = (children[3] as Identifier).name;
+                const thisParam = new Param(name, type);
+                const otherParams = children.length > 4 && children[4] instanceof ParamList ? (children[4] as ParamList).params : [];
+                return new ParamList([thisParam, ...otherParams], pos.line, pos.column);
+            }
+            case 'Args': {
+                if (children.length === 0) return new ArgList([], pos.line, pos.column);
+                const firstArg = children[0] as ASTNode;
+                const otherArgs = children.length > 1 && children[1] instanceof ArgList ? (children[1] as ArgList).args : [];
+                return new ArgList([firstArg, ...otherArgs], pos.line, pos.column);
+            }
+            case 'MoreArgs': {
+                if (children.length === 0) return new ArgList([], pos.line, pos.column);
+                const firstArg = children[1] as ASTNode;
+                const otherArgs = children.length > 2 && children[2] instanceof ArgList ? (children[2] as ArgList).args : [];
+                return new ArgList([firstArg, ...otherArgs], pos.line, pos.column);
+            }
+
+            // Expression Rules
+            case 'Factor': {
+                const first = children[0];
+
+                if (first instanceof ASTNode) { // Rule: <Factor> -> <ArrayAccess>
+                    return first;
                 }
 
-                if (children[childIndex] instanceof Identifier) { // Или Literal, если тип - базовый (e.g. "int", "string")
-                    varTypeNode = children[childIndex] as Identifier; // Для примера используем Identifier, но может быть и Literal("int")
-                    childIndex++;
-                } else if (children[childIndex] instanceof Token) { // Если тип это просто строковый токен
-                    varTypeNode = new Identifier((children[childIndex] as Token).lexeme); // Оборачиваем в Identifier для консистентности с AST
-                    childIndex++;
-                }
-                else {
-                    throw new Error(`VarDecl: ожидался идентификатор типа переменной. Получено: ${children[childIndex]?.constructor.name}`);
-                }
+                if (isToken(first)) {
+                    switch (first.type) {
+                        case TT.IDENTIFIER:
+                            // Rule: <Factor> -> id or <Factor> -> id ( <Args> )
+                            if (children.length > 1 && isToken(children[1]) && children[1].type === TT.PUNCT_LPAREN) {
+                                const callee = first.value;
+                                const argsNode = children[2] as ArgList | undefined;
+                                const args = (argsNode && argsNode.args) ? argsNode.args : [];
+                                return new CallExpr(callee, args, first.line, first.column);
+                            }
+                            return new Identifier(first.value, first.line, first.column);
 
+                        case TT.PUNCT_LPAREN:
+                            // Rule: <Factor> -> ( <Expression> )
+                            return children[1] as ASTNode;
 
-                // Проверяем наличие инициализатора
-                if (children[childIndex] instanceof Token && (children[childIndex] as Token).lexeme === '=') {
-                    childIndex++;
-                    if (children[childIndex] instanceof ASTNode) {
-                        varInitializer = children[childIndex] as ASTNode;
-                        childIndex++;
-                    } else {
-                        throw new Error(`VarDecl: ожидался ASTNode для инициализатора. Получено: ${children[childIndex]?.constructor.name}`);
+                        case TT.PUNCT_MINUS:
+                            // Rule: <Factor> -> - <Factor>
+                            return new UnaryExpr('-', children[1] as ASTNode, first.line, first.column);
+
+                        case TT.NUMBER:
+                        case TT.STRING:
+                        case TT.KEYWORD_TRUE:
+                        case TT.KEYWORD_FALSE: {
+                            // Rule: <Factor> -> literal
+                            let value: any = first.value;
+                            if (first.type === TT.NUMBER) value = Number(value);
+                            else if (first.type === TT.KEYWORD_TRUE) value = true;
+                            else if (first.type === TT.KEYWORD_FALSE) value = false;
+                            else if (first.type === TT.STRING) value = value.slice(1, -1);
+                            return new Literal(value, first.line, first.column);
+                        }
+                        case TT.PUNCT_LBRACKET: // '['
+                            console.log('Factor -> [');
+                            return new ArrayLiteral([], pos.line, pos.column); // Placeholder for now
                     }
                 }
-                // Пропускаем токен ';' , если он есть
-                if (children[childIndex] instanceof Token && (children[childIndex] as Token).lexeme === ';') {
-                    childIndex++;
+
+                if (children[0] instanceof ArrayLiteral) {
+                    return children[0];
                 }
 
-                if (!varNameNode || !varTypeNode) {
-                    throw new Error(`VarDecl: не удалось извлечь имя или тип переменной из детей: ${JSON.stringify(children.map(c => c instanceof ASTNode ? c.constructor.name : c))}`);
+                console.log('Unhandled Factor:', JSON.stringify(children, null, 2));
+                throw new Error(`Unhandled Factor: ${JSON.stringify(children)}`);
+            }
+
+            // Type Rules
+            case 'Type':
+                return children[0] as ASTNode;
+            case 'BaseType':
+                const baseTypeToken = children[0] as Token;
+                return new Identifier(baseTypeToken.value, baseTypeToken.line, baseTypeToken.column);
+            case 'ArrayType':
+                const baseType = (children[0] as Identifier).name;
+                const arrayToken = children[1] as Token;
+                return new Identifier(`${baseType}[]`, arrayToken.line, arrayToken.column);
+
+            // Literal / Identifier from Token
+            case 'Literal': // A generic case for building literals from single tokens
+                const token = children[0] as Token;
+                if (token.type === TT.IDENTIFIER) return new Identifier(token.value, token.line, token.column);
+
+                let value: any;
+                switch (token.type) {
+                    case TT.NUMBER: value = Number(token.value); break;
+                    case TT.STRING: value = token.value.slice(1, -1); break; // remove quotes
+                    case TT.KEYWORD_TRUE: value = true; break;
+                    case TT.KEYWORD_FALSE: value = false; break;
+                    default: value = token.value;
                 }
+                return new Literal(value, token.line, token.column);
 
-                return new VarDecl(varNameNode.name, varTypeNode.name, varInitializer);
-
-
-            case 'ConstDecl':
-                // Аналогично VarDecl, но значение обязательно.
-                // Пример правила: <ConstDecl> -> const id : type = <Expression> ; ~ConstDecl
-                let constNameNode: Identifier | undefined;
-                let constTypeNode: Identifier | undefined; // Предполагаем, что тип тоже может быть Identifier
-                let constValueNode: ASTNode | undefined;
-
-                let constChildIndex = 0;
-                // Пропускаем токен 'const'
-                if (children[constChildIndex] instanceof Token && (children[constChildIndex] as Token).lexeme === 'const') {
-                    constChildIndex++;
+            // Array Rules
+            case 'ArrayLiteral': {
+                if (children.length === 2) { // Empty array: [ ]
+                    return new ArrayLiteral([], pos.line, pos.column);
                 }
-
-                if (children[constChildIndex] instanceof Identifier) {
-                    constNameNode = children[constChildIndex] as Identifier;
-                    constChildIndex++;
-                } else {
-                    throw new Error(`ConstDecl: ожидался идентификатор имени константы.`);
-                }
-
-                // Пропускаем токен ':'
-                if (children[constChildIndex] instanceof Token && (children[constChildIndex] as Token).lexeme === ':') {
-                    constChildIndex++;
-                }
-
-                if (children[constChildIndex] instanceof Identifier) { // Или Literal
-                    constTypeNode = children[constChildIndex] as Identifier;
-                    constChildIndex++;
-                } else if (children[constChildIndex] instanceof Token) {
-                    constTypeNode = new Identifier((children[constChildIndex] as Token).lexeme);
-                    constChildIndex++;
-                } else {
-                    throw new Error(`ConstDecl: ожидался идентификатор типа константы.`);
-                }
-
-                // Пропускаем токен '='
-                if (children[constChildIndex] instanceof Token && (children[constChildIndex] as Token).lexeme === '=') {
-                    constChildIndex++;
-                } else {
-                    throw new Error(`ConstDecl: ожидался токен '='.`);
-                }
-
-                if (children[constChildIndex] instanceof ASTNode) {
-                    constValueNode = children[constChildIndex] as ASTNode;
-                    constChildIndex++;
-                } else {
-                    throw new Error(`ConstDecl: ожидался ASTNode для значения константы.`);
-                }
-
-                // Пропускаем токен ';'
-                if (children[constChildIndex] instanceof Token && (children[constChildIndex] as Token).lexeme === ';') {
-                    constChildIndex++;
-                }
-
-
-                if (!constNameNode || !constTypeNode || !constValueNode) {
-                    throw new Error(`ConstDecl: не удалось извлечь все компоненты из детей: ${JSON.stringify(children.map(c => c instanceof ASTNode ? c.constructor.name : c))}`);
-                }
-                return new ConstDecl(constNameNode.name, constTypeNode.name, constValueNode);
-
-            // case 'FuncDecl':
-            //     // <FuncDecl> -> func id ( <ParamList> ) : <type_id> <Block> ~FuncDecl
-            //     // children: [Token(func), Identifier(name), Token('('), ASTNode_for_ParamList?, Token(')'), Token(:), Identifier(returnType), BlockNode_body]
-            //     // ASTNode_for_ParamList может быть специальным узлом или массивом Param объектов.
-            //     // Для простоты предположим, что ParamList - это массив Param объектов, которые мы соберем здесь.
-            //     // Или что ParamList - это один ASTNode, который содержит массив Param (напр. new ParamList(...))
-            //
-            //     let funcNameNode!: Identifier;
-            //     const funcParams: Param[] = [];
-            //     let funcReturnTypeNode!: Identifier; // Или Literal для базовых типов
-            //     let funcBodyNode!: Block;
-            //
-            //     let funcChildIndex = 0;
-            //
-            //     // Пропускаем 'func'
-            //     if (children[funcChildIndex] instanceof Token && (children[funcChildIndex] as Token).lexeme === 'func') funcChildIndex++;
-            //
-            //     if (children[funcChildIndex] instanceof Identifier) {
-            //         funcNameNode = children[funcChildIndex++] as Identifier;
-            //     } else throw new Error("FuncDecl: Ожидался идентификатор имени функции.");
-            //
-            //     // Пропускаем '('
-            //     if (children[funcChildIndex] instanceof Token && (children[funcChildIndex] as Token).lexeme === '(') funcChildIndex++;
-            //     else throw new Error("FuncDecl: Ожидался токен '('.");
-            //
-            //     // Собираем параметры
-            //     // Предположим, параметры идут как [Identifier(name), Token(:), Identifier(type), Token(,), ...]
-            //     // Либо у вас может быть правило <ParamList> -> <Param> | <Param> , <ParamList>
-            //     // И дети для ParamList будут уже [ParamNode1, ParamNode2, ...]
-            //     // Для примера, если параметры передаются как отдельные узлы Param:
-            //     while (!(children[funcChildIndex] instanceof Token && (children[funcChildIndex] as Token).lexeme === ')')) {
-            //         if (children[funcChildIndex] instanceof Param) { // Если Param это уже ASTNode
-            //             funcParams.push(children[funcChildIndex++] as Param);
-            //         }
-            //         // Если параметры приходят как (name: Identifier, type: Identifier)
-            //         else if (children[funcChildIndex] instanceof Identifier &&
-            //             children[funcChildIndex+1] instanceof Token && (children[funcChildIndex+1] as Token).lexeme === ':' &&
-            //             children[funcChildIndex+2] instanceof Identifier) {
-            //             const paramName = (children[funcChildIndex] as Identifier).name;
-            //             const paramType = (children[funcChildIndex+2] as Identifier).name;
-            //             funcParams.push(new Param(paramName, paramType));
-            //             funcChildIndex += 3;
-            //         }
-            //         else {
-            //             // Если параметров нет, и сразу идет ')', то это нормально.
-            //             if (children[funcChildIndex] instanceof Token && (children[funcChildIndex] as Token).lexeme === ')') break;
-            //             throw new Error(`FuncDecl: Неожиданный элемент в списке параметров: ${children[funcChildIndex]?.constructor.name}`);
-            //         }
-            //
-            //         if (children[funcChildIndex] instanceof Token && (children[funcChildIndex] as Token).lexeme === ',') {
-            //             funcChildIndex++; // Пропускаем запятую
-            //         } else if (!(children[funcChildIndex] instanceof Token && (children[funcChildIndex] as Token).lexeme === ')')) {
-            //             throw new Error("FuncDecl: Ожидалась ',' или ')' после параметра.");
-            //         }
-            //     }
-            //     // Пропускаем ')'
-            //     if (children[funcChildIndex] instanceof Token && (children[funcChildIndex] as Token).lexeme === ')') funcChildIndex++;
-            //     else throw new Error("FuncDecl: Ожидался токен ')'.");
-            //
-            //     // Пропускаем ':'
-            //     if (children[funcChildIndex] instanceof Token && (children[funcChildIndex] as Token).lexeme === ':') funcChildIndex++;
-            //     else throw new Error("FuncDecl: Ожидался токен ':'.");
-            //
-            //     if (children[funcChildIndex] instanceof Identifier) { // Или Literal
-            //         funcReturnTypeNode = children[funcChildIndex++] as Identifier;
-            //     } else if (children[funcChildIndex] instanceof Token) {
-            //         funcReturnTypeNode = new Identifier((children[funcChildIndex++] as Token).lexeme);
-            //     }
-            //     else throw new Error("FuncDecl: Ожидался идентификатор типа возвращаемого значения.");
-            //
-            //     if (children[funcChildIndex] instanceof Block) {
-            //         funcBodyNode = children[funcChildIndex++] as Block;
-            //     } else throw new Error("FuncDecl: Ожидался Block для тела функции.");
-            //
-            //     return new FuncDecl(funcNameNode.name, funcParams, funcReturnTypeNode.name, funcBodyNode);
-            //
-            // // Param не является ASTNode в вашем определении, он используется в FuncDecl.
-            // // Если бы Param был ASTNode, то для него было бы свое правило и действие:
-            // // case 'Param':
-            // //     // <Param> -> id : <type_id> ~Param
-            // //     // children: [Identifier_name, Token_colon, Identifier_type]
-            // //     if (children.length >= 3 && children[0] instanceof Identifier && children[2] instanceof Identifier) {
-            // //         return new Param((children[0] as Identifier).name, (children[2] as Identifier).name);
-            // //     }
-            // //     throw new Error(`Invalid children for Param action.`);
-
-            case 'AssignExpr':
-                // <AssignExpr> -> id = <Expression> ~AssignExpr (возможно, с ';' в конце)
-                // children: [IdentifierNode_name, Token_eq, ASTNode_value]
-                if (children.length >= 3 &&
-                    children[0] instanceof Identifier &&
-                    (children[1] instanceof Token && (children[1] as Token).lexeme === '=') &&
-                    children[2] instanceof ASTNode) {
-                    return new AssignExpr((children[0] as Identifier).name, children[2] as ASTNode);
-                }
-                throw new Error(`Invalid children for AssignExpr action.`);
-
-            case 'BinaryExpr':
-                // <Expr> -> <Expr> + <Term> ~BinaryExpr
-                // children: [ASTNode_left, Token_operator, ASTNode_right]
-                if (children.length === 3 &&
-                    children[0] instanceof ASTNode &&
-                    children[1] instanceof Token &&
-                    children[2] instanceof ASTNode) {
-                    const left = children[0] as ASTNode;
-                    const operator = (children[1] as Token).lexeme;
-                    const right = children[2] as ASTNode;
-                    return new BinaryExpr(left, operator, right);
-                }
-                throw new Error(
-                    `Invalid children for BinaryExpr action. Rule: ${rule.left} -> ${rule.right.join(' ')}. Children: ${JSON.stringify(children.map(c => c instanceof ASTNode ? c.constructor.name : (c as Token).lexeme))}`
-                );
-
-            case 'UnaryExpr':
-                // <UnaryExpr> -> - <Factor> ~UnaryExpr  ИЛИ ! <Factor> ~UnaryExpr
-                // children: [Token_operator, ASTNode_operand]
-                if (children.length === 2 &&
-                    children[0] instanceof Token &&
-                    children[1] instanceof ASTNode) {
-                    return new UnaryExpr((children[0] as Token).lexeme, children[1] as ASTNode);
-                }
-                throw new Error(`Invalid children for UnaryExpr action.`);
-
-            // case 'CallExpr':
-            //     // <CallExpr> -> id ( <ArgList> ) ~CallExpr
-            //     // children: [IdentifierNode_callee, Token_(, ASTNode_for_ArgList?, Token_)]
-            //     // ASTNode_for_ArgList может быть специальным узлом или просто массивом ASTNode.
-            //     // Для простоты будем считать, что ArgList - это массив ASTNode.
-            //     let calleeNode!: Identifier;
-            //     const callArgs: ASTNode[] = [];
-            //     let callChildIndex = 0;
-            //
-            //     if (children[callChildIndex] instanceof Identifier) {
-            //         calleeNode = children[callChildIndex++] as Identifier;
-            //     } else throw new Error("CallExpr: Ожидался идентификатор для вызываемой функции.");
-            //
-            //     // Пропускаем '('
-            //     if (children[callChildIndex] instanceof Token && (children[callChildIndex] as Token).lexeme === '(') callChildIndex++;
-            //     else throw new Error("CallExpr: Ожидался токен '('.");
-            //
-            //     // Собираем аргументы
-            //     // Аргументы - это ASTNode, разделенные запятыми
-            //     while (!(children[callChildIndex] instanceof Token && (children[callChildIndex] as Token).lexeme === ')')) {
-            //         if (children[callChildIndex] instanceof ASTNode) {
-            //             callArgs.push(children[callChildIndex++] as ASTNode);
-            //         } else {
-            //             // Если аргументов нет и сразу ')', то это нормально
-            //             if (children[callChildIndex] instanceof Token && (children[callChildIndex] as Token).lexeme === ')') break;
-            //             throw new Error(`CallExpr: Неожиданный элемент в списке аргументов: ${children[callChildIndex]?.constructor.name}`);
-            //         }
-            //
-            //         if (children[callChildIndex] instanceof Token && (children[callChildIndex] as Token).lexeme === ',') {
-            //             callChildIndex++; // Пропускаем запятую
-            //         } else if (!(children[callChildIndex] instanceof Token && (children[callChildIndex] as Token).lexeme === ')')) {
-            //             throw new Error("CallExpr: Ожидалась ',' или ')' после аргумента.");
-            //         }
-            //     }
-            //     // Пропускаем ')'
-            //     if (children[callChildIndex] instanceof Token && (children[callChildIndex] as Token).lexeme === ')') callChildIndex++;
-            //     else throw new Error("CallExpr: Ожидался токен ')'.");
-            //
-            //     return new CallExpr(calleeNode.name, callArgs);
-
-            case 'Literal':
-                if (children.length === 1 && children[0] instanceof Token) {
-                    const token = children[0] as Token;
-                    if (token.type === Lexeme.INTEGER) return new Literal(parseInt(token.lexeme, 10));
-                    if (token.type === Lexeme.FLOAT) return new Literal(parseFloat(token.lexeme));
-                    if (token.type === Lexeme.STRING) return new Literal(token.lexeme);
-                    if (token.type === Lexeme.TRUE) return new Literal(true);
-                    if (token.type === Lexeme.FALSE) return new Literal(false);
-                    if (token.lexeme === 'null') return new Literal(null);
-                }
-                throw new Error(`Invalid children for Literal action. Expected LiteralNode or a value Token. Got: ${JSON.stringify(children)}`);
-            case 'Ident':
-                if (children.length === 1 && children[0] instanceof Token && (children[0] as Token).type === Lexeme.IDENTIFIER) {
-                    return new Identifier((children[0] as Token).lexeme);
-                }
-                throw new Error(`Invalid children for Identifier action. Expected Identifier Token. Got: ${JSON.stringify(children)}`);
-
-            // case 'IfStmt':
-            //     // <IfStmt> -> if <Expr> then <Block> [elif <Expr> then <Block>]* [else <Block>]? end ~IfStmt
-            //     // Это сложный случай, т.к. elif и else опциональны и elif может быть несколько.
-            //     // children: [Token(if), ASTNode_cond, Token(then), Block_then, (Token(elif), ASTNode_cond, Token(then), Block_elif)*, (Token(else), Block_else)?, Token(end)]
-            //
-            //     let ifCondition!: ASTNode;
-            //     let ifThenBranch!: Block;
-            //     const elifBranches: { condition: ASTNode, block: Block }[] = [];
-            //     let ifElseBranch: Block | undefined;
-            //
-            //     let ifStmtChildIndex = 0;
-            //
-            //     // 'if'
-            //     if (children[ifStmtChildIndex] instanceof Token && (children[ifStmtChildIndex] as Token).lexeme === 'if') ifStmtChildIndex++;
-            //     else throw new Error("IfStmt: Ожидался токен 'if'.");
-            //
-            //     if (children[ifStmtChildIndex] instanceof ASTNode) {
-            //         ifCondition = children[ifStmtChildIndex++] as ASTNode;
-            //     } else throw new Error("IfStmt: Ожидался ASTNode для условия if.");
-            //
-            //     // 'then'
-            //     if (children[ifStmtChildIndex] instanceof Token && (children[ifStmtChildIndex] as Token).lexeme === 'then') ifStmtChildIndex++;
-            //     else throw new Error("IfStmt: Ожидался токен 'then'.");
-            //
-            //
-            //     if (children[ifStmtChildIndex] instanceof Block) {
-            //         ifThenBranch = children[ifStmtChildIndex++] as Block;
-            //     } else throw new Error("IfStmt: Ожидался Block для then-ветки.");
-            //
-            //     // Elif ветки
-            //     while (children[ifStmtChildIndex] instanceof Token && (children[ifStmtChildIndex] as Token).lexeme === 'elif') {
-            //         ifStmtChildIndex++; // 'elif'
-            //
-            //         let elifCondition!: ASTNode;
-            //         let elifBlock!: Block;
-            //
-            //         if (children[ifStmtChildIndex] instanceof ASTNode) {
-            //             elifCondition = children[ifStmtChildIndex++] as ASTNode;
-            //         } else throw new Error("IfStmt: Ожидался ASTNode для условия elif.");
-            //
-            //         // 'then' для elif
-            //         if (children[ifStmtChildIndex] instanceof Token && (children[ifStmtChildIndex] as Token).lexeme === 'then') ifStmtChildIndex++;
-            //         else throw new Error("IfStmt: Ожидался токен 'then' для elif.");
-            //
-            //
-            //         if (children[ifStmtChildIndex] instanceof Block) {
-            //             elifBlock = children[ifStmtChildIndex++] as Block;
-            //         } else throw new Error("IfStmt: Ожидался Block для elif-ветки.");
-            //         elifBranches.push({ condition: elifCondition, block: elifBlock });
-            //     }
-            //
-            //     // Else ветка
-            //     if (children[ifStmtChildIndex] instanceof Token && (children[ifStmtChildIndex] as Token).lexeme === 'else') {
-            //         ifStmtChildIndex++; // 'else'
-            //         if (children[ifStmtChildIndex] instanceof Block) {
-            //             ifElseBranch = children[ifStmtChildIndex++] as Block;
-            //         } else throw new Error("IfStmt: Ожидался Block для else-ветки.");
-            //     }
-            //
-            //     // 'end' (или 'fi' в некоторых языках)
-            //     if (children[ifStmtChildIndex] instanceof Token && (children[ifStmtChildIndex] as Token).lexeme === 'end') ifStmtChildIndex++;
-            //     // else throw new Error("IfStmt: Ожидался токен 'end'."); // Может быть не нужен, если `end` не часть правила АСД
-            //
-            //     return new IfStmt(ifCondition, ifThenBranch, elifBranches, ifElseBranch);
-            //
-            // case 'WhileStmt':
-            //     // <WhileStmt> -> while <Expr> do <Block> end ~WhileStmt
-            //     // children: [Token(while), ASTNode_cond, Token(do), Block_body, Token(end)]
-            //     let whileCondition!: ASTNode;
-            //     let whileBody!: Block;
-            //     let whileChildIndex = 0;
-            //
-            //     if (children[whileChildIndex] instanceof Token && (children[whileChildIndex] as Token).lexeme === 'while') whileChildIndex++;
-            //     else throw new Error("WhileStmt: Ожидался токен 'while'.");
-            //
-            //     if (children[whileChildIndex] instanceof ASTNode) {
-            //         whileCondition = children[whileChildIndex++] as ASTNode;
-            //     } else throw new Error("WhileStmt: Ожидался ASTNode для условия while.");
-            //
-            //     if (children[whileChildIndex] instanceof Token && (children[whileChildIndex] as Token).lexeme === 'do') whileChildIndex++;
-            //     else throw new Error("WhileStmt: Ожидался токен 'do'.");
-            //
-            //     if (children[whileChildIndex] instanceof Block) {
-            //         whileBody = children[whileChildIndex++] as Block;
-            //     } else throw new Error("WhileStmt: Ожидался Block для тела while.");
-            //
-            //     // Token(end)
-            //     if (children[whileChildIndex] instanceof Token && (children[whileChildIndex] as Token).lexeme === 'end') whileChildIndex++;
-            //     // else throw new Error("WhileStmt: Ожидался токен 'end'.");
-            //
-            //     return new WhileStmt(whileCondition, whileBody);
-            //
-            // case 'ForStmt':
-            //     // <ForStmt> -> for ( <InitExpr>? ; <CondExpr>? ; <UpdateExpr>? ) <Block> ~ForStmt
-            //     // children: [Token(for), Token('('), ASTNode_init?, Token(;), ASTNode_cond?, Token(;), ASTNode_update?, Token(')'), Block_body]
-            //     // Любая из частей init, condition, update может быть null.
-            //     let forInit: ASTNode | null = null;
-            //     let forCondition: ASTNode | null = null;
-            //     let forUpdate: ASTNode | null = null;
-            //     let forBody!: Block;
-            //     let forChildIndex = 0;
-            //
-            //     if (children[forChildIndex] instanceof Token && (children[forChildIndex] as Token).lexeme === 'for') forChildIndex++;
-            //     else throw new Error("ForStmt: Ожидался токен 'for'.");
-            //
-            //     if (children[forChildIndex] instanceof Token && (children[forChildIndex] as Token).lexeme === '(') forChildIndex++;
-            //     else throw new Error("ForStmt: Ожидался токен '('.");
-            //
-            //     // Init
-            //     if (!(children[forChildIndex] instanceof Token && (children[forChildIndex] as Token).lexeme === ';')) {
-            //         if (children[forChildIndex] instanceof ASTNode) {
-            //             forInit = children[forChildIndex++] as ASTNode;
-            //         } else throw new Error("ForStmt: Ожидался ASTNode или ';' для инициализации.");
-            //     }
-            //     if (children[forChildIndex] instanceof Token && (children[forChildIndex] as Token).lexeme === ';') forChildIndex++;
-            //     else throw new Error("ForStmt: Ожидался токен ';' после инициализации.");
-            //
-            //     // Condition
-            //     if (!(children[forChildIndex] instanceof Token && (children[forChildIndex] as Token).lexeme === ';')) {
-            //         if (children[forChildIndex] instanceof ASTNode) {
-            //             forCondition = children[forChildIndex++] as ASTNode;
-            //         } else throw new Error("ForStmt: Ожидался ASTNode или ';' для условия.");
-            //     }
-            //     if (children[forChildIndex] instanceof Token && (children[forChildIndex] as Token).lexeme === ';') forChildIndex++;
-            //     else throw new Error("ForStmt: Ожидался токен ';' после условия.");
-            //
-            //     // Update
-            //     if (!(children[forChildIndex] instanceof Token && (children[forChildIndex] as Token).lexeme === ')')) {
-            //         if (children[forChildIndex] instanceof ASTNode) {
-            //             forUpdate = children[forChildIndex++] as ASTNode;
-            //         } else throw new Error("ForStmt: Ожидался ASTNode или ')' для обновления.");
-            //     }
-            //
-            //     if (children[forChildIndex] instanceof Token && (children[forChildIndex] as Token).lexeme === ')') forChildIndex++;
-            //     else throw new Error("ForStmt: Ожидался токен ')'.");
-            //
-            //     if (children[forChildIndex] instanceof Block) {
-            //         forBody = children[forChildIndex++] as Block;
-            //     } else throw new Error("ForStmt: Ожидался Block для тела for.");
-            //
-            //     return new ForStmt(forInit, forCondition, forUpdate, forBody);
-
-            // Случаи 'Ident' и 'Num' уже были, но переименую 'Num' в 'Literal' для общего случая,
-            // если вы не сделали этого в парсере при вызове _createASTNode (SLRTableParser.ts)
-            case 'Num':
-                if (children.length === 1 && children[0] instanceof Token &&
-                    ((children[0] as Token).type === Lexeme.INTEGER || (children[0] as Token).type === Lexeme.FLOAT)) {
-                    const tokenVal = (children[0] as Token).lexeme;
-                    const numVal = (children[0] as Token).type === Lexeme.INTEGER ? parseInt(tokenVal, 10) : parseFloat(tokenVal);
-                    return new Literal(numVal);
-                }
-                throw new Error(`Invalid children for Num action. Expected LiteralNode or Number Token. Got: ${JSON.stringify(children)}`);
+                // Has elements: [ <ArrayElements> ]
+                const elementsNode = children[1] as ArgList; // Re-use ArgList logic
+                return new ArrayLiteral(elementsNode.args, pos.line, pos.column);
+            }
+            case 'ArrayElements': {
+                const first = children[0] as ASTNode;
+                const others = children.length > 1 ? (children[1] as ArgList).args : [];
+                return new ArgList([first, ...others], pos.line, pos.column); // Use ArgList as a temp holder
+            }
+            case 'MoreArrayElements': {
+                if (children.length === 0) return new ArgList([], pos.line, pos.column);
+                const first = children[1] as ASTNode;
+                const others = children.length > 2 ? (children[2] as ArgList).args : [];
+                return new ArgList([first, ...others], pos.line, pos.column);
+            }
+            case 'ArrayAccess': {
+                const arrayIdentifier = children[0] as Token;
+                const index = children[2] as ASTNode;
+                return new ArrayAccess(new Identifier(arrayIdentifier.value, arrayIdentifier.line, arrayIdentifier.column), index, pos.line, pos.column);
+            }
+            case 'ArrayMember': {
+                return children[0] as ASTNode;
+            }
 
             default:
-                throw new Error(`Неизвестное имя действия АСД: ${actionName}`);
+                // For rules like <E> -> <T> etc.
+                if (children.length === 1 && children[0] instanceof ASTNode) {
+                    return children[0];
+                }
+                console.warn(`Unhandled AST action: ${actionName}`);
+                // Instead of throwing, we return a placeholder or the first child if it's a node
+                // This helps to pinpoint grammar issues without crashing
+                return children[0] instanceof ASTNode ? children[0] : new Identifier(`UNHANDLED:${actionName}`, pos.line, pos.column);
         }
     }
 }
 
 export {
+    isToken,
+    DUMMY_POS,
     ASTBuilder,
 }

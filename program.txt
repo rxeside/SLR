@@ -1,0 +1,11 @@
+function outer() : num {
+    let x : num = 10;
+
+    function inner() : num {
+        return x + 5; // Доступ к 'x' из внешней области
+    }
+
+    return inner();
+}
+
+let result : num = outer(); 

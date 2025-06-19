@@ -2,12 +2,22 @@ import {ASTVisitor} from '@src/ast/visitor'
 
 // Базовый узел AST
 abstract class ASTNode {
+    public type: string;
+    public line: number;
+    public column: number;
+
+    constructor(line: number = 0, column: number = 0) {
+        this.type = this.constructor.name;
+        this.line = line;
+        this.column = column;
+    }
+
     abstract accept(visitor: ASTVisitor): any;
 }
 
 class Program extends ASTNode {
-    constructor(public statements: ASTNode[]) {
-        super();
+    constructor(public statements: ASTNode[], line?: number, column?: number) {
+        super(line, column);
     }
 
     accept(visitor: ASTVisitor) {
@@ -16,8 +26,8 @@ class Program extends ASTNode {
 }
 
 class Block extends ASTNode {
-    constructor(public statements: ASTNode[]) {
-        super();
+    constructor(public statements: ASTNode[], line?: number, column?: number) {
+        super(line, column);
     }
 
     accept(visitor: ASTVisitor) {
@@ -26,8 +36,8 @@ class Block extends ASTNode {
 }
 
 class VarDecl extends ASTNode {
-    constructor(public name: string, public type: string, public initializer?: ASTNode) {
-        super();
+    constructor(public name: string, public type: string, public initializer?: ASTNode, line?: number, column?: number) {
+        super(line, column);
     }
 
     accept(visitor: ASTVisitor) {
@@ -36,8 +46,8 @@ class VarDecl extends ASTNode {
 }
 
 class ConstDecl extends ASTNode {
-    constructor(public name: string, public type: string, public value: ASTNode) {
-        super();
+    constructor(public name: string, public type: string, public value: ASTNode, line?: number, column?: number) {
+        super(line, column);
     }
 
     accept(visitor: ASTVisitor) {
@@ -50,9 +60,10 @@ class FuncDecl extends ASTNode {
         public name: string,
         public params: Param[],
         public returnType: string,
-        public body: Block
+        public body: Block,
+        line?: number, column?: number
     ) {
-        super();
+        super(line, column);
     }
 
     accept(visitor: ASTVisitor) {
@@ -65,8 +76,8 @@ class Param {
 }
 
 class AssignExpr extends ASTNode {
-    constructor(public name: string, public value: ASTNode) {
-        super();
+    constructor(public target: Identifier | ArrayAccess, public value: ASTNode, line?: number, column?: number) {
+        super(line, column);
     }
 
     accept(visitor: ASTVisitor) {
@@ -75,8 +86,8 @@ class AssignExpr extends ASTNode {
 }
 
 class BinaryExpr extends ASTNode {
-    constructor(public left: ASTNode, public operator: string, public right: ASTNode) {
-        super();
+    constructor(public left: ASTNode, public operator: string, public right: ASTNode, line?: number, column?: number) {
+        super(line, column);
     }
 
     accept(visitor: ASTVisitor) {
@@ -85,8 +96,8 @@ class BinaryExpr extends ASTNode {
 }
 
 class UnaryExpr extends ASTNode {
-    constructor(public operator: string, public operand: ASTNode) {
-        super();
+    constructor(public operator: string, public operand: ASTNode, line?: number, column?: number) {
+        super(line, column);
     }
 
     accept(visitor: ASTVisitor) {
@@ -95,8 +106,8 @@ class UnaryExpr extends ASTNode {
 }
 
 class CallExpr extends ASTNode {
-    constructor(public callee: string, public args: ASTNode[]) {
-        super();
+    constructor(public callee: string, public args: ASTNode[], line?: number, column?: number) {
+        super(line, column);
     }
 
     accept(visitor: ASTVisitor) {
@@ -105,8 +116,8 @@ class CallExpr extends ASTNode {
 }
 
 class Literal extends ASTNode {
-    constructor(public value: string | number | boolean | null) {
-        super();
+    constructor(public value: string | number | boolean | null, line?: number, column?: number) {
+        super(line, column);
     }
 
     accept(visitor: ASTVisitor) {
@@ -115,8 +126,8 @@ class Literal extends ASTNode {
 }
 
 class Identifier extends ASTNode {
-    constructor(public name: string) {
-        super();
+    constructor(public name: string, line?: number, column?: number) {
+        super(line, column);
     }
 
     accept(visitor: ASTVisitor) {
@@ -129,9 +140,10 @@ class IfStmt extends ASTNode {
         public condition: ASTNode,
         public thenBranch: Block,
         public elifBranches: { condition: ASTNode, block: Block }[] = [],
-        public elseBranch?: Block
+        public elseBranch?: Block,
+        line?: number, column?: number
     ) {
-        super();
+        super(line, column);
     }
 
     accept(visitor: ASTVisitor) {
@@ -140,8 +152,8 @@ class IfStmt extends ASTNode {
 }
 
 class WhileStmt extends ASTNode {
-    constructor(public condition: ASTNode, public body: Block) {
-        super();
+    constructor(public condition: ASTNode, public body: Block, line?: number, column?: number) {
+        super(line, column);
     }
 
     accept(visitor: ASTVisitor) {
@@ -154,13 +166,64 @@ class ForStmt extends ASTNode {
         public init: ASTNode | null,
         public condition: ASTNode | null,
         public update: ASTNode | null,
-        public body: Block
+        public body: Block,
+        line?: number, column?: number
     ) {
-        super();
+        super(line, column);
     }
 
     accept(visitor: ASTVisitor) {
         return visitor.visitForStmt(this);
+    }
+}
+
+class ReturnStmt extends ASTNode {
+    constructor(public value: ASTNode, line?: number, column?: number) {
+        super(line, column);
+    }
+
+    accept(visitor: ASTVisitor) {
+        return visitor.visitReturnStmt(this);
+    }
+}
+
+class ArrayLiteral extends ASTNode {
+    constructor(public elements: ASTNode[], line?: number, column?: number) {
+        super(line, column);
+    }
+
+    accept(visitor: ASTVisitor) {
+        return visitor.visitArrayLiteral(this);
+    }
+}
+
+class ArrayAccess extends ASTNode {
+    constructor(public array: ASTNode, public index: ASTNode, line?: number, column?: number) {
+        super(line, column);
+    }
+
+    accept(visitor: ASTVisitor) {
+        return visitor.visitArrayAccess(this);
+    }
+}
+
+class ParamList extends ASTNode {
+    constructor(public params: Param[], line?: number, column?: number) {
+        super(line, column);
+    }
+
+    accept(visitor: ASTVisitor) {
+        throw new Error("Method not implemented.");
+    }
+}
+
+class ArgList extends ASTNode {
+    constructor(public args: ASTNode[], line?: number, column?: number) {
+        super(line, column);
+    }
+
+    accept(visitor: ASTVisitor): any {
+        throw new Error("Method not implemented.");
     }
 }
 
@@ -181,4 +244,9 @@ export {
     IfStmt,
     WhileStmt,
     ForStmt,
+    ReturnStmt,
+    ArrayLiteral,
+    ArrayAccess,
+    ParamList,
+    ArgList,
 }
