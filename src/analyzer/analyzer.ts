@@ -164,6 +164,9 @@ export class SemanticAnalyzer {
 
         switch (node.operator) {
             case '+':
+                if (leftType === 'num' && rightType === 'num') return 'num';
+                if (leftType === 'string' || rightType === 'string') return 'string';
+                break;
             case '-':
             case '*':
             case '/':
@@ -182,7 +185,23 @@ export class SemanticAnalyzer {
     }
 
     private visitUnaryExpr(node: UnaryExpr): string | null {
-        return this.visit(node.operand);
+        const operandType = this.visit(node.operand);
+        if (!operandType) {
+            return null;
+        }
+
+        switch (node.operator) {
+            case '-':
+                if (operandType === 'num') return 'num';
+                this.errorHandler.addError(`Unary operator '-' cannot be applied to type '${operandType}'`, node.line, node.column, ErrorType.Semantic);
+                return null;
+            case '!':
+                if (operandType === 'bool') return 'bool';
+                this.errorHandler.addError(`Unary operator '!' cannot be applied to type '${operandType}'`, node.line, node.column, ErrorType.Semantic);
+                return null;
+        }
+
+        return operandType;
     }
 
     private visitCallExpr(node: CallExpr): string | null {
@@ -190,7 +209,7 @@ export class SemanticAnalyzer {
             if (node.args.length !== 1) {
                 this.errorHandler.addError(`Function 'print' expects 1 argument, but received ${node.args.length}`, node.line, node.column, ErrorType.Semantic);
             } else {
-                this.visit(node.args[0]); // Analyze the argument
+                this.visit(node.args[0]);
             }
             return 'void';
         }

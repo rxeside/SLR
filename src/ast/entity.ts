@@ -58,7 +58,7 @@ class ConstDecl extends ASTNode {
 class FuncDecl extends ASTNode {
     constructor(
         public name: string,
-        public params: Param[],
+        public params: Param[] = [],
         public returnType: string,
         public body: Block,
         line?: number, column?: number

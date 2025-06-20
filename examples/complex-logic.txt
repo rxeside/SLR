@@ -1,0 +1,52 @@
+// 1. Инициализация переменных разных типов
+let a: num = 10;
+const b: num = -5; // Унарный минус на литерале
+let perform_calc: bool = true;
+let use_positive: bool = false;
+
+print("--- Начальные значения ---");
+print(a);      // 10
+print(b);      // -5
+print(perform_calc); // true
+print(use_positive); // false
+print("--------------------------");
+
+
+// 2. Вложенные условные операторы
+if (perform_calc) {
+    print("Вход в первый if (perform_calc is true)");
+
+    let c: num = 0;
+
+    if (!use_positive) { // !false -> true
+        print("Вход во вложенный if (!use_positive is true)");
+        
+        // 3. Вычисления с умножением и унарным минусом
+        c = a * b; // 10 * -5 = -50
+        print("a * b =");
+        print(c);
+
+        c = a * -c; // 10 * -(-50) = 10 * 50 = 500
+        print("a * -c =");
+        print(c);
+
+    } else {
+        // Этот блок не должен выполниться
+        print("Вложенный else (не должен выполниться)");
+        c = a * a;
+        print(c);
+    }
+    
+    print("Результат после вложенных if:");
+    print(c);
+
+} else {
+    // Этот блок не должен выполниться
+    print("Основной else (не должен выполниться)");
+}
+
+// 4. Проверка логического НЕ
+let is_false: bool = !true;
+if (!is_false) { // !(!true) -> !(false) -> true
+    print("Проверка !is_false прошла успешно!");
+} 

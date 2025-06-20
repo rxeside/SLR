@@ -29,10 +29,11 @@ export interface Position {
     column: number;
 }
 
-// Вспомогательная функция для проверки, является ли объект токеном
 function isToken(obj: any): obj is Token {
     return obj && typeof obj === 'object' && 'type' in obj;
 }
+
+const DUMMY_POS: Position = { line: 0, column: 0 };
 
 function getFirstPosition(children: (ASTNode | Token)[]): Position {
     for (const child of children) {
@@ -45,9 +46,6 @@ function getFirstPosition(children: (ASTNode | Token)[]): Position {
     }
     return DUMMY_POS;
 }
-
-// Константа для позиции по умолчанию
-const DUMMY_POS: Position = { line: 0, column: 0 };
 
 class ASTBuilder {
     static buildNode(actionName: string, children: (ASTNode | Token)[], rule: GrammarRule): ASTNode {
@@ -79,9 +77,6 @@ class ASTBuilder {
             case 'Expression':
             case 'ArrayIndex':
             case 'ArrayMember':
-            case 'E':
-            case 'T':
-            case 'F':
                 return children[0] as ASTNode;
 
             case 'LogicExpr':
@@ -95,7 +90,6 @@ class ASTBuilder {
             }
 
             // Statement Rules
-            case 'BaseDeclaration':
             case 'Declaration': { // let id : <Type> = <Expression> ;
                 const keywordToken = children[0] as Token;
                 const nameToken = children[1] as Token;
@@ -201,7 +195,7 @@ class ASTBuilder {
             case 'Factor': {
                 const first = children[0];
 
-                if (first instanceof ASTNode) { // Rule: <Factor> -> <ArrayAccess>
+                if (first instanceof ASTNode) { // Rule: <Factor> -> <ArrayAccess> | <ArrayLiteral>
                     return first;
                 }
 
@@ -222,8 +216,9 @@ class ASTBuilder {
                             return children[1] as ASTNode;
 
                         case TT.PUNCT_MINUS:
-                            // Rule: <Factor> -> - <Factor>
-                            return new UnaryExpr('-', children[1] as ASTNode, first.line, first.column);
+                        case TT.OP_NOT:
+                            // Rule: <Factor> -> - <Factor> or ! <Factor>
+                            return new UnaryExpr(first.value, children[1] as ASTNode, first.line, first.column);
 
                         case TT.NUMBER:
                         case TT.STRING:
@@ -237,21 +232,10 @@ class ASTBuilder {
                             else if (first.type === TT.STRING) value = value.slice(1, -1);
                             return new Literal(value, first.line, first.column);
                         }
-                        case TT.PUNCT_LBRACKET: // '['
-                            console.log('Factor -> [');
-                            return new ArrayLiteral([], pos.line, pos.column); // Placeholder for now
                     }
                 }
-
-                if (children[0] instanceof ArrayLiteral) {
-                    return children[0];
-                }
-
-                console.log('Unhandled Factor:', JSON.stringify(children, null, 2));
-                throw new Error(`Unhandled Factor: ${JSON.stringify(children)}`);
             }
 
-            // Type Rules
             case 'Type':
                 return children[0] as ASTNode;
             case 'BaseType':
@@ -262,28 +246,13 @@ class ASTBuilder {
                 const arrayToken = children[1] as Token;
                 return new Identifier(`${baseType}[]`, arrayToken.line, arrayToken.column);
 
-            // Literal / Identifier from Token
-            case 'Literal': // A generic case for building literals from single tokens
-                const token = children[0] as Token;
-                if (token.type === TT.IDENTIFIER) return new Identifier(token.value, token.line, token.column);
-
-                let value: any;
-                switch (token.type) {
-                    case TT.NUMBER: value = Number(token.value); break;
-                    case TT.STRING: value = token.value.slice(1, -1); break; // remove quotes
-                    case TT.KEYWORD_TRUE: value = true; break;
-                    case TT.KEYWORD_FALSE: value = false; break;
-                    default: value = token.value;
-                }
-                return new Literal(value, token.line, token.column);
-
-            // Array Rules
             case 'ArrayLiteral': {
                 if (children.length === 2) { // Empty array: [ ]
                     return new ArrayLiteral([], pos.line, pos.column);
                 }
                 // Has elements: [ <ArrayElements> ]
-                const elementsNode = children[1] as ArgList; // Re-use ArgList logic
+                // Re-using ArgList as a temporary data structure is a bit of a hack, but it works.
+                const elementsNode = children[1] as ArgList;
                 return new ArrayLiteral(elementsNode.args, pos.line, pos.column);
             }
             case 'ArrayElements': {
@@ -298,22 +267,33 @@ class ASTBuilder {
                 return new ArgList([first, ...others], pos.line, pos.column);
             }
             case 'ArrayAccess': {
-                const arrayIdentifier = children[0] as Token;
+                // Rule 1: <ArrayAccess> -> id [ <ArrayIndex> ]
+                // Rule 2: <ArrayAccess> -> <ArrayAccess> [ <ArrayIndex> ]
+                const arrayNode = children[0];
                 const index = children[2] as ASTNode;
-                return new ArrayAccess(new Identifier(arrayIdentifier.value, arrayIdentifier.line, arrayIdentifier.column), index, pos.line, pos.column);
+
+                let base: ASTNode;
+                if (isToken(arrayNode) && arrayNode.type === TT.IDENTIFIER) {
+                    base = new Identifier(arrayNode.value, arrayNode.line, arrayNode.column);
+                } else if (arrayNode instanceof ASTNode) {
+                    base = arrayNode;
+                } else {
+                    // This path should not be reachable with a valid grammar
+                    return new Identifier(`INVALID_ARRAY_ACCESS`, pos.line, pos.column);
+                }
+                
+                return new ArrayAccess(base, index, pos.line, pos.column);
             }
             case 'ArrayMember': {
                 return children[0] as ASTNode;
             }
 
             default:
-                // For rules like <E> -> <T> etc.
+                // For rules like <E> -> <T> etc., which just pass the node up.
                 if (children.length === 1 && children[0] instanceof ASTNode) {
                     return children[0];
                 }
-                console.warn(`Unhandled AST action: ${actionName}`);
-                // Instead of throwing, we return a placeholder or the first child if it's a node
-                // This helps to pinpoint grammar issues without crashing
+                // This case helps to pinpoint grammar issues without crashing
                 return children[0] instanceof ASTNode ? children[0] : new Identifier(`UNHANDLED:${actionName}`, pos.line, pos.column);
         }
     }

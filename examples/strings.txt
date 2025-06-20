@@ -1,0 +1,22 @@
+let greeting: string = "Hello";
+const target: string = "World";
+const punctuation: string = "!";
+
+function greet(person: string): string {
+    let full_greeting: string = greeting + ", " + person + punctuation;
+    print(full_greeting);
+    return full_greeting;
+}
+
+let combined: string = greeting + " " + target;
+print(combined);
+
+let person_name: string = "Alice";
+let greeted_person: string = greet(person_name);
+
+print("Функция вернула:");
+print(greeted_person);
+
+let age: num = 30;
+let message: string = person_name + " is " + age;
+print(message); 

@@ -1,5 +1,4 @@
 import { SemanticAnalyzer } from '../analyzer';
-import { Program } from '../../ast/entity';
 import { Lexer } from '../../lexer/lexer';
 import { SLRParser } from '../../slr/slr';
 import { fullGrammar } from '../../../integration-tests/grammars';
@@ -128,7 +127,7 @@ describe('SemanticAnalyzer', () => {
         const source = `let x: num = 10 + "hello";`;
         const errors = analyzeWithErrors(source);
         expect(errors.length).toBeGreaterThan(0);
-        expect(errors[0].message).toContain("Operator '+' cannot be applied to types 'num' and 'string'");
+        expect(errors[0].message).toContain("Type mismatch: cannot assign 'string' to 'num'");
     });
 
     test('should throw an error for incorrect return type', () => {

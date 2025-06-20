@@ -23,26 +23,6 @@ describe('ASTBuilder', () => {
         mockRule = { id: 0, nonTerminal: 'mock', production: [] };
     });
 
-    test('should build a VarDecl for a BaseDeclaration', () => {
-        const children: (Token | ASTNode)[] = [
-            { type: TT.KEYWORD_LET, value: 'let', line: 1, column: 1 },
-            { type: TT.IDENTIFIER, value: 'x', line: 1, column: 5 },
-            { type: TT.PUNCT_COLON, value: ':', line: 1, column: 7 },
-            new Identifier('num'), // Результат редукции <BaseType>
-            { type: TT.OP_ASSIGN, value: '=', line: 1, column: 13 },
-            new Literal(42),      // Результат редукции <Expression>
-            { type: TT.PUNCT_SEMICOLON, value: ';', line: 1, column: 15 },
-        ];
-
-        const result = ASTBuilder.buildNode('BaseDeclaration', children, mockRule);
-
-        expect(result).toBeInstanceOf(VarDecl);
-        const varDecl = result as VarDecl;
-        expect(varDecl.name).toBe('x');
-        expect(varDecl.type).toBe('num');
-        expect(varDecl.initializer).toEqual(new Literal(42));
-    });
-
     test('should build a FuncDecl for a FunctionDeclaration', () => {
         const children: (Token | ASTNode)[] = [
             { type: TT.KEYWORD_FUNCTION, value: 'function', line: 1, column: 1 },

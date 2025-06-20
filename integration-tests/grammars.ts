@@ -58,6 +58,7 @@ export const fullGrammar = [
     "<MulExpr> -> <Factor> * <MulExpr>",
     "<MulExpr> -> <Factor>",
     "<Factor> -> - <Factor>",
+    "<Factor> -> ! <Factor>",
     "<Factor> -> id",
     "<Factor> -> id ( <Args> )",
     "<Factor> -> <ArrayAccess>",
