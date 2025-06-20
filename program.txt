@@ -1,11 +1,28 @@
-function outer() : num {
-    let x : num = 10;
+let a: num[] = [123, 2, 19];
 
-    function inner() : num {
-        return x + 5; // Доступ к 'x' из внешней области
+function bubbleSort(arr: num[]): num[]
+{
+    let size: num =  arrayLength(arr);
+    let i: num = 0;
+    let j: num = 0;
+    let temp: num = 0;
+
+    while (i < size) {
+        j = 0;
+        while (j < (size - i) - 1) {
+            if (arr[j] > arr[j + 1])
+            {
+                temp = arr[j];
+                arr[j] = arr[j + 1];
+                arr[j + 1] = temp;
+            }
+            j = j + 1;
+            print(j);
+        }
+        i = i + 1;
     }
 
-    return inner();
+    return arr;
 }
 
-let result : num = outer(); 
+print(bubbleSort(a));

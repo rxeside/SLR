@@ -112,6 +112,10 @@ export class CodeGenerator {
             const arg = this.visit(node.args[0]);
             return `console.log(${arg})`;
         }
+        if (node.callee === 'arrayLength') {
+            const arg = this.visit(node.args[0]);
+            return `${arg}.length`;
+        }
         const args = node.args.map(arg => this.visit(arg)).join(', ');
         return `${node.callee}(${args})`;
     }

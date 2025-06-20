@@ -148,6 +148,18 @@ export class SemanticAnalyzer {
             return 'void';
         }
 
+        if (node.callee === 'arrayLength') {
+            if (node.args.length !== 1) {
+                this.errorHandler.addError(`Function 'arrayLength' expects 1 argument, but received ${node.args.length}`, node.line, node.column, ErrorType.Semantic);
+            } else {
+                const argType = this.visit(node.args[0]);
+                if (argType && !argType.endsWith('[]')) {
+                    this.errorHandler.addError(`Argument for 'arrayLength' must be an array, but got '${argType}'`, node.line, node.column, ErrorType.Semantic);
+                }
+            }
+            return 'num';
+        }
+
         const symbol = this.symbolTable.lookup(node.callee);
         if (!symbol || !symbol.isFunction) {
             this.errorHandler.addError(`Function '${node.callee}' not found or not a function`, node.line, node.column, ErrorType.Semantic);

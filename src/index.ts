@@ -13,11 +13,9 @@ function compileAndRun(sourceCode: string): void {
     const errorHandler = new ErrorHandler();
     errorHandler.setSourceCode(sourceCode);
 
-    // 1. Lexer
     const lexer = new Lexer();
     const tokens = lexer.tokenize(sourceCode, errorHandler);
 
-    // 2. Parser
     const parser = new SLRParser(fullGrammar, errorHandler);
     const ast = parser.parse(tokens);
 
@@ -27,7 +25,6 @@ function compileAndRun(sourceCode: string): void {
         return;
     }
 
-    // 3. Semantic Analyzer
     const symbolTable = new SymbolTable();
     const analyzer = new SemanticAnalyzer(symbolTable, errorHandler);
     analyzer.analyze(ast);
@@ -38,35 +35,23 @@ function compileAndRun(sourceCode: string): void {
         return;
     }
 
-    // 4. Code Generator
     const generator = new CodeGenerator();
-    let jsCode = generator.generate(ast);
+    const jsCode = generator.generate(ast);
 
-    // Wrap the code to capture the last expression's value
-    const lastStatement = ast.statements[ast.statements.length - 1];
-    let resultVariableName: string | null = null;
-    if (lastStatement instanceof VarDecl) {
-        resultVariableName = lastStatement.name;
-    } else if (lastStatement instanceof AssignExpr && lastStatement.target instanceof Identifier) {
-        resultVariableName = lastStatement.target.name;
-    }
-
-    if (resultVariableName) {
-        jsCode += `\n;${resultVariableName};`;
-    }
-
-    // 5. Run the generated code
+    const capturedOutput = [];
     const sandbox = {
         console: {
             log: (...args: any[]) => {
-                // Intercept log calls if needed in the future
+                capturedOutput.push(args.map(arg => JSON.stringify(arg, null, 2)).join(' '));
             }
         }
     };
 
     try {
-        const result = vm.runInNewContext(jsCode, sandbox);
-        console.log(result);
+        vm.runInNewContext(jsCode, sandbox);
+        if (capturedOutput.length > 0) {
+            console.log(capturedOutput.join('\n'));
+        }
     } catch (e) {
         console.error("Error during execution:", e);
     }
