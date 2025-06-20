@@ -4,6 +4,7 @@ export interface SymbolEntry {
     value?: any;           
     localIndex: number;    
     address?: number;      
+    isConst?: boolean;
     
     isFunction?: boolean;       
     paramTypes?: string[];      
@@ -59,7 +60,8 @@ export class SymbolTable {
         isFunction: boolean = false, 
         paramTypes?: string[], 
         returnType?: string, 
-        isFunctionDefined: boolean = false
+        isFunctionDefined: boolean = false,
+        isConst: boolean = false,
     ): SymbolEntry | null {
         // Проверяем существование символа ТОЛЬКО в текущей области видимости
         const existingEntry = this.currentScope.symbols.get(name);
@@ -86,6 +88,7 @@ export class SymbolTable {
             type,
             value,
             localIndex: this.getNextLocalIndex(this.currentScope),
+            isConst: isConst,
             isFunction: isFunction || false,
             paramTypes: isFunction ? (paramTypes || []) : undefined,
             returnType: isFunction ? (returnType || 'void') : undefined,

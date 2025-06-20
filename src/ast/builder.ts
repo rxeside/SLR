@@ -18,6 +18,7 @@ import {
     ArrayAccess,
     ParamList,
     ArgList,
+    ConstDecl,
 } from './entity'
 import {GrammarRule} from '../grammar/types';
 import {TT} from '../lexer/constants';
@@ -96,13 +97,16 @@ class ASTBuilder {
             // Statement Rules
             case 'BaseDeclaration':
             case 'Declaration': { // let id : <Type> = <Expression> ;
+                const keywordToken = children[0] as Token;
                 const nameToken = children[1] as Token;
                 const typeNode = children[3] as Identifier; // This should be the result of the <Type> rule
                 const initializerNode = children[5] as ASTNode;
 
                 const varName = nameToken.value;
                 const varType = typeNode.name; // <Type> becomes an Identifier with the type name
-
+                if (keywordToken.value === 'const') {
+                    return new ConstDecl(varName, varType, initializerNode, pos.line, pos.column);
+                }
                 return new VarDecl(varName, varType, initializerNode, pos.line, pos.column);
             }
             case 'ReturnStatement': { // return <Expression> ;

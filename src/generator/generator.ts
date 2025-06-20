@@ -2,6 +2,7 @@ import {
     ASTNode,
     Program,
     VarDecl,
+    ConstDecl,
     FuncDecl,
     Block,
     IfStmt,
@@ -26,6 +27,7 @@ export class CodeGenerator {
         switch (node.constructor) {
             case Program: return this.visitProgram(node as Program);
             case VarDecl: return this.visitVarDecl(node as VarDecl);
+            case ConstDecl: return this.visitConstDecl(node as ConstDecl);
             case AssignExpr: return this.visitAssignExpr(node as AssignExpr);
             case FuncDecl: return this.visitFuncDecl(node as FuncDecl);
             case Block: return this.visitBlock(node as Block);
@@ -61,6 +63,10 @@ export class CodeGenerator {
             jsCode += ` = ${this.visit(node.initializer)}`;
         }
         return jsCode;
+    }
+
+    private visitConstDecl(node: ConstDecl): string {
+        return `const ${node.name} = ${this.visit(node.value)}`;
     }
 
     private visitFuncDecl(node: FuncDecl): string {

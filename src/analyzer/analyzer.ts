@@ -1,4 +1,22 @@
-import { ASTNode, Program, VarDecl, FuncDecl, Block, IfStmt, WhileStmt, ReturnStmt, AssignExpr, BinaryExpr, UnaryExpr, CallExpr, Literal, Identifier, ArrayLiteral, ArrayAccess, Param, ParamList, ArgList } from '../ast/entity';
+import {
+    ASTNode,
+    Program,
+    VarDecl,
+    FuncDecl,
+    Block,
+    IfStmt,
+    WhileStmt,
+    ReturnStmt,
+    AssignExpr,
+    BinaryExpr,
+    UnaryExpr,
+    CallExpr,
+    Literal,
+    Identifier,
+    ArrayLiteral,
+    ArrayAccess,
+    ConstDecl
+} from '../ast/entity';
 import { SymbolTable, SymbolEntry } from '../symbolTable/symbolTable';
 import { ErrorHandler, ErrorType } from '../error/error';
 
@@ -24,6 +42,7 @@ export class SemanticAnalyzer {
         switch (node.constructor) {
             case Program:           this.visitProgram(node as Program); return null;
             case VarDecl:           this.visitVarDecl(node as VarDecl); return null;
+            case ConstDecl:         this.visitConstDecl(node as ConstDecl); return null;
             case AssignExpr:        this.visitAssignExpr(node as AssignExpr); return null;
             case FuncDecl:          this.visitFuncDecl(node as FuncDecl); return null;
             case Block:             this.visitBlock(node as Block); return null;
@@ -52,7 +71,7 @@ export class SemanticAnalyzer {
     }
 
     private visitVarDecl(node: VarDecl): void {
-        const success = this.symbolTable.add(node.name, node.type);
+        const success = this.symbolTable.add(node.name, node.type, undefined, false, undefined, undefined, false, false);
         if (!success) {
             this.errorHandler?.addError(`Symbol '${node.name}' already declared in the current scope`, node.line, node.column, ErrorType.Semantic);
         }
@@ -62,6 +81,24 @@ export class SemanticAnalyzer {
             if (initializerType !== node.type) {
                 this.errorHandler?.addError(`Type mismatch: cannot assign '${initializerType}' to '${node.type}'`, node.line, node.column, ErrorType.Semantic);
             }
+        }
+    }
+
+    private visitConstDecl(node: ConstDecl): void {
+        if (!node.value) {
+            this.errorHandler?.addError(`Constant '${node.name}' must be initialized.`, node.line, node.column, ErrorType.Semantic);
+            return;
+        }
+
+        const success = this.symbolTable.add(node.name, node.type, undefined, false, undefined, undefined, false, true);
+        if (!success) {
+            this.errorHandler?.addError(`Symbol '${node.name}' already declared in the current scope`, node.line, node.column, ErrorType.Semantic);
+            return;
+        }
+
+        const initializerType = this.visit(node.value);
+        if (initializerType !== node.type) {
+            this.errorHandler?.addError(`Type mismatch: cannot assign '${initializerType}' to '${node.type}'`, node.line, node.column, ErrorType.Semantic);
         }
     }
 
@@ -100,6 +137,16 @@ export class SemanticAnalyzer {
 
     private visitAssignExpr(node: AssignExpr): void {
         const valueType = this.visit(node.value);
+        let targetSymbol;
+        if (node.target instanceof Identifier) {
+            targetSymbol = this.symbolTable.lookup(node.target.name);
+        }
+
+        if (targetSymbol && targetSymbol.isConst) {
+            this.errorHandler?.addError(`Cannot assign to constant '${targetSymbol.name}'`, node.line, node.column, ErrorType.Semantic);
+            return;
+        }
+
         const targetType = this.visit(node.target);
 
         if (targetType !== valueType) {

@@ -10,6 +10,7 @@ export const fullGrammar = [
     "<Statement> -> <ReturnStatement>",
     "<Statement> -> <Assignment>",
     "<Declaration> -> let id : <Type> = <Expression> ;",
+    "<Declaration> -> const id : <Type> = <Expression> ;",
     "<ReturnStatement> -> return <Expression> ;",
     "<Assignment> -> id = <Expression> ;",
     "<Assignment> -> <ArrayAccess> = <Expression> ;",
